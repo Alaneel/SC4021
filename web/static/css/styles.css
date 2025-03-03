@@ -1,0 +1,197 @@
+/* Main Styles for EV Opinion Search Engine */
+
+/* General styling */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #333;
+    background-color: #f8f9fa;
+}
+
+/* Search header styling */
+.search-header {
+    background: linear-gradient(135deg, #2962ff 0%, #0039cb 100%);
+    color: white;
+    padding: 3rem 0;
+    margin-bottom: 2rem;
+}
+
+.search-header h1 {
+    font-weight: 700;
+}
+
+.search-header .lead {
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+/* Search container and input styling */
+.search-container {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#search-input {
+    border-radius: 0.5rem 0 0 0.5rem;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+#search-form .btn-primary {
+    border-radius: 0 0.5rem 0.5rem 0;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+/* Suggestions dropdown */
+#suggestions {
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-top: 0.5rem;
+    z-index: 1000;
+}
+
+#suggestions a {
+    padding: 0.75rem 1rem;
+    border-left: 3px solid transparent;
+}
+
+#suggestions a:hover {
+    border-left: 3px solid #0d6efd;
+    background-color: #f0f7ff;
+}
+
+/* Advanced filters */
+#advanced-filters {
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Main content area */
+main {
+    min-height: 600px;
+}
+
+/* Dashboard cards */
+.card {
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-bottom: 1px solid #e9ecef;
+}
+
+/* Chart containers */
+.chart-container {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Facet styling */
+#facets .form-check {
+    margin-bottom: 0.5rem;
+}
+
+#facets .form-check-label {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+#facets .form-check-label .badge {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+/* Search result items */
+.result-item {
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e9ecef;
+    margin-bottom: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.result-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.result-item h5 {
+    margin-bottom: 0.75rem;
+    color: #0d6efd;
+}
+
+/* Sentiment badges */
+.badge.sentiment-positive {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge.sentiment-negative {
+    background-color: #dc3545;
+    color: white;
+}
+
+.badge.sentiment-neutral {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* Highlighted text in search results */
+.highlight {
+    background-color: #fff3cd;
+    padding: 0.1rem 0.2rem;
+    border-radius: 0.2rem;
+}
+
+/* Pagination */
+.pagination {
+    justify-content: center;
+}
+
+.page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* Footer styling */
+footer {
+    color: #6c757d;
+    border-top: 1px solid #e9ecef;
+}
+
+/* About page specific styling */
+.about-section h2 {
+    color: #0d6efd;
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .search-header {
+        padding: 2rem 0;
+    }
+
+    .search-header h1 {
+        font-size: 2rem;
+    }
+
+    .card-title {
+        font-size: 1.25rem;
+    }
+
+    .result-item {
+        padding: 1rem;
+    }
+}

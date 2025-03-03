@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Opinion Search Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <!-- Navigation bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-lightning-charge-fill me-2"></i>EV Opinion Search
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('index') }}">Search</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('about') }}">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Search header -->
+    <header class="search-header py-5">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-md-10 text-center">
+                    <h1 class="display-4 mb-4">Electric Vehicle Opinion Search</h1>
+                    <p class="lead mb-4">Discover what people think about electric vehicles, brands, features, and more</p>
+
+                    <!-- Search form -->
+                    <div class="search-container">
+                        <form id="search-form" class="d-flex flex-column gap-2">
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-lg" id="search-input" name="q"
+                                    placeholder="Search EV opinions..." autocomplete="off">
+                                <button class="btn btn-primary btn-lg" type="submit">
+                                    <i class="bi bi-search"></i> Search
+                                </button>
+                            </div>
+                            <div id="suggestions" class="list-group position-absolute w-75" style="z-index: 1000; display: none;"></div>
+
+                            <!-- Advanced filters (initially hidden) -->
+                            <div id="advanced-filters" class="card mt-3" style="display: none;">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Date Range</label>
+                                            <div class="d-flex gap-2">
+                                                <input type="date" class="form-control" id="from-date" name="from">
+                                                <span class="align-self-center">to</span>
+                                                <input type="date" class="form-control" id="to-date" name="to">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Sentiment</label>
+                                            <select class="form-select" id="sentiment-filter" name="sentiment">
+                                                <option value="">All</option>
+                                                <option value="positive">Positive</option>
+                                                <option value="negative">Negative</option>
+                                                <option value="neutral">Neutral</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Content Type</label>
+                                            <select class="form-select" id="type-filter" name="type">
+                                                <option value="">All</option>
+                                                <option value="post">Posts</option>
+                                                <option value="comment">Comments</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Toggle for advanced filters -->
+                            <div class="text-center mt-2">
+                                <button type="button" id="toggle-filters" class="btn btn-link">
+                                    <i class="bi bi-sliders"></i> Advanced Filters
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container my-4">
+        <!-- Initial Dashboard -->
+        <div id="dashboard" class="mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">EV Opinion Trends</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-center">Sentiment Distribution</h5>
+                                    <div id="sentiment-chart" class="chart-container text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-center">Opinion Timeline</h5>
+                                    <div id="time-chart" class="chart-container text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search results (initially hidden) -->
+        <div id="search-results-container" style="display: none;">
+            <div class="row">
+                <!-- Facets sidebar -->
+                <div class="col-md-3">
+                    <div id="facets">
+                        <!-- Sentiment distribution -->
+                        <div class="card mb-3">
+                            <div class="card-header">Sentiment Distribution</div>
+                            <div class="card-body">
+                                <div id="results-sentiment-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+
+                        <!-- Word cloud -->
+                        <div class="card mb-3">
+                            <div class="card-header">Key Terms</div>
+                            <div class="card-body">
+                                <div id="wordcloud" class="chart-container"></div>
+                            </div>
+                        </div>
+
+                        <!-- Topics filter -->
+                        <div class="card mb-3">
+                            <div class="card-header">Topics</div>
+                            <div class="card-body">
+                                <div id="topic-facets"></div>
+                            </div>
+                        </div>
+
+                        <!-- Entity filter -->
+                        <div class="card mb-3">
+                            <div class="card-header">Entities</div>
+                            <div class="card-body">
+                                <div id="entity-facets"></div>
+                            </div>
+                        </div>
+
+                        <!-- Source filter -->
+                        <div class="card mb-3">
+                            <div class="card-header">Sources</div>
+                            <div class="card-body">
+                                <div id="subreddit-facets"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search results -->
+                <div class="col-md-9">
+                    <div id="results-info" class="mb-3"></div>
+                    <div id="results"></div>
+                    <div id="pagination" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0">EV Opinion Search Engine</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">&copy; 2023 All Rights Reserved</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.6.3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
