@@ -1,5 +1,5 @@
 """
-Text cleaning utilities for preprocessing Reddit data
+Text cleaning utilities for preprocessing X (Twitter) data
 """
 import re
 import pandas as pd
@@ -27,6 +27,17 @@ def clean_text(text):
 
     # Remove URLs
     text = re.sub(r'http\S+', '', text)
+    text = re.sub(r'https\S+', '', text)
+
+    # Convert X-specific entities to more readable form
+    # Replace @mentions with "User: "
+    text = re.sub(r'@(\w+)', r'User: \1', text)
+
+    # Replace #hashtags with just the word
+    text = re.sub(r'#(\w+)', r'\1', text)
+
+    # Remove RT prefix commonly found in retweets
+    text = re.sub(r'^RT\s+', '', text)
 
     # Remove markdown formatting
     text = re.sub(r'\*\*|\*|~~|==|__|>!|!<|>|#|`', '', text)
@@ -105,6 +116,15 @@ def preprocess_dataset(df):
 
     # Filter out very short content
     df = df[df['word_count'] >= 5]
+
+    # Process X-specific fields
+    if 'hashtags' in df.columns:
+        # Convert comma-separated hashtags to list format for Solr indexing
+        df['hashtags'] = df['hashtags'].apply(lambda x: x.split(',') if isinstance(x, str) and x else [])
+
+    if 'mentions' in df.columns:
+        # Convert comma-separated mentions to list format for Solr indexing
+        df['mentions'] = df['mentions'].apply(lambda x: x.split(',') if isinstance(x, str) and x else [])
 
     logger.info(f"Final preprocessed dataset size: {len(df)}")
     return df

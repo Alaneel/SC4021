@@ -16,24 +16,15 @@ MODELS_DIR = os.path.join(BASE_DIR, 'classification', 'models')
 for directory in [DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, EVALUATION_DIR, MODELS_DIR]:
     os.makedirs(directory, exist_ok=True)
 
-# Crawler configuration
-REDDIT_CLIENT_ID = os.environ.get('REDDIT_CLIENT_ID', '')
-REDDIT_CLIENT_SECRET = os.environ.get('REDDIT_CLIENT_SECRET', '')
-REDDIT_USER_AGENT = os.environ.get('REDDIT_USER_AGENT', 'EV Opinion Search Engine v1.0')
+# X (Twitter) API Configuration
+X_API_KEY = os.environ.get('X_API_KEY', '')
+X_API_SECRET = os.environ.get('X_API_SECRET', '')
+X_BEARER_TOKEN = os.environ.get('X_BEARER_TOKEN', '')
+X_ACCESS_TOKEN = os.environ.get('X_ACCESS_TOKEN', '')
+X_ACCESS_SECRET = os.environ.get('X_ACCESS_SECRET', '')
+X_USER_AGENT = os.environ.get('X_USER_AGENT', 'EV Opinion Search Engine v1.0')
 
-SUBREDDITS = [
-    "electricvehicles",
-    "teslamotors",
-    "cars",
-    "RivianForums",
-    "lucidmotors",
-    "BoltEV",
-    "NIOInvestorsClub",
-    "technology",
-    "energy",
-    "environment"
-]
-
+# Search queries for X
 SEARCH_QUERIES = [
     "electric vehicle", "EV", "Tesla", "Rivian", "Lucid Motors", "Bolt EV",
     "Nissan Leaf", "EV charging", "electric car", "battery range",

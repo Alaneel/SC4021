@@ -7,7 +7,7 @@ A comprehensive search engine for analyzing and exploring opinions about electri
 The EV Opinion Search Engine is a specialized tool for collecting, analyzing, and searching public opinions about electric vehicles. It combines web crawling, information retrieval, sentiment analysis, and topic modeling to provide a complete solution for understanding consumer perceptions of EVs.
 
 Key features:
-- Crawls and collects EV-related opinions from Reddit
+- Crawls and collects EV-related opinions from X (Twitter)
 - Indexes content for fast and efficient searching
 - Analyzes sentiment (positive, negative, neutral)
 - Identifies topics and entities mentioned in opinions
@@ -23,7 +23,7 @@ SC4021/
 │   └── solr_schema.xml   # Solr schema definition
 │
 ├── crawler/              # Data collection module
-│   ├── reddit_crawler.py # Reddit data collector
+│   ├── x_crawler.py      # X (Twitter) data collector
 │   └── data_cleaner.py   # Text cleaning utilities
 │
 ├── indexing/             # Search indexing module
@@ -59,7 +59,7 @@ SC4021/
 
 - Python 3.8 or higher
 - Apache Solr 8.11 or higher
-- Reddit API credentials (for crawler)
+- X (Twitter) API credentials
 
 ### Setup
 
@@ -87,9 +87,12 @@ SC4021/
 
 5. Set up environment variables:
    ```bash
-   # Reddit API credentials (required for crawler)
-   export REDDIT_CLIENT_ID="your_client_id"
-   export REDDIT_CLIENT_SECRET="your_client_secret"
+   # X (Twitter) API credentials (required for crawler)
+   export X_BEARER_TOKEN="your_bearer_token"
+   export X_API_KEY="your_api_key"
+   export X_API_SECRET="your_api_secret"
+   export X_ACCESS_TOKEN="your_access_token"
+   export X_ACCESS_SECRET="your_access_secret"
    
    # Solr configuration (optional, defaults provided)
    export SOLR_URL="http://localhost:8983/solr"
@@ -104,18 +107,18 @@ SC4021/
 
 ### Data Collection
 
-To crawl EV opinions from Reddit:
+To crawl EV opinions from X (Twitter):
 
 ```bash
 python scripts/run_crawler.py --limit 100 --preprocess
 ```
 
 Options:
-- `--subreddits`: Specify subreddits to crawl (default: from config)
 - `--queries`: Specify search queries (default: from config)
-- `--limit`: Maximum posts per query (default: 100)
+- `--limit`: Maximum tweets per query (default: 100)
 - `--preprocess`: Apply text preprocessing to clean the data
 - `--output`: Specify output file name
+- `--bearer-token`: Specify X Bearer Token (or use environment variable)
 
 ### Indexing
 
@@ -180,11 +183,25 @@ The web interface provides:
 - Interactive word clouds
 - Filtering by sentiment, date, source, topics, and entities
 
+## X API Usage and Limits
+
+When using the X API for data collection, be aware of the following:
+
+1. **Rate Limits**: X API has rate limits that restrict the number of requests you can make in a certain time period (typically 300-900 requests per 15-minute window depending on your access level).
+
+2. **Access Tiers**: X offers different access tiers (Essential, Elevated, Academic) that determine your rate limits and data access. Check your Developer Portal for your current access level.
+
+3. **Search Limitations**: The standard search API only returns tweets from the past 7 days. Historical data requires Academic Access.
+
+4. **Content Filtering**: Some content may be filtered by X's own algorithms.
+
+The crawler includes automatic rate limit handling with backoff strategies to prevent API lockouts.
+
 ## Development
 
 ### Adding New Data Sources
 
-To add a new data source, create a new crawler in the `crawler` module following the pattern established by `reddit_crawler.py`.
+To add a new data source, create a new crawler in the `crawler` module following the pattern established by `x_crawler.py`.
 
 ### Extending Classification
 
@@ -202,3 +219,4 @@ To add new classification capabilities:
 - This project uses the Transformers library by Hugging Face for sentiment analysis
 - Topic modeling is implemented using Gensim
 - Web interface built with Flask and Bootstrap
+- X API access through Tweepy

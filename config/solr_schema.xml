@@ -10,8 +10,17 @@
     <field name="author" type="string" indexed="true" stored="true" />
     <field name="created_utc" type="pdate" indexed="true" stored="true" />
     <field name="score" type="pint" indexed="true" stored="true" />
-    <field name="subreddit" type="string" indexed="true" stored="true" />
     <field name="url" type="string" indexed="false" stored="true" />
+
+    <!-- Platform-specific fields -->
+    <field name="platform" type="string" indexed="true" stored="true" />  <!-- 'x' or other platforms -->
+    <field name="subreddit" type="string" indexed="true" stored="true" />  <!-- Kept for backward compatibility -->
+
+    <!-- X (Twitter) specific fields -->
+    <field name="retweet_count" type="pint" indexed="true" stored="true" />
+    <field name="quote_count" type="pint" indexed="true" stored="true" />
+    <field name="hashtags" type="string" indexed="true" stored="true" multiValued="true" />
+    <field name="mentions" type="string" indexed="true" stored="true" multiValued="true" />
 
     <!-- Additional fields for sentiment analysis results -->
     <field name="sentiment" type="string" indexed="true" stored="true" />
@@ -38,7 +47,9 @@
     <copyField source="title" dest="_text_"/>
     <copyField source="text" dest="_text_"/>
     <copyField source="author" dest="_text_"/>
-    <copyField source="subreddit" dest="_text_"/>
+    <copyField source="platform" dest="_text_"/>
+    <copyField source="hashtags" dest="_text_"/>
+    <copyField source="mentions" dest="_text_"/>
     <copyField source="topics" dest="_text_"/>
     <copyField source="entities" dest="_text_"/>
 
