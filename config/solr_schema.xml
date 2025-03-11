@@ -13,14 +13,14 @@
     <field name="url" type="string" indexed="false" stored="true" />
 
     <!-- Platform-specific fields -->
-    <field name="platform" type="string" indexed="true" stored="true" />  <!-- 'x' or other platforms -->
+    <field name="platform" type="string" indexed="true" stored="true" />  <!-- 'news' or other platforms -->
     <field name="subreddit" type="string" indexed="true" stored="true" />  <!-- Kept for backward compatibility -->
 
-    <!-- X (Twitter) specific fields -->
-    <field name="retweet_count" type="pint" indexed="true" stored="true" />
-    <field name="quote_count" type="pint" indexed="true" stored="true" />
-    <field name="hashtags" type="string" indexed="true" stored="true" multiValued="true" />
-    <field name="mentions" type="string" indexed="true" stored="true" multiValued="true" />
+    <!-- News Article specific fields -->
+    <field name="source_name" type="string" indexed="true" stored="true" />
+    <field name="source_id" type="string" indexed="true" stored="true" />
+    <field name="description" type="text_general" indexed="true" stored="true" />
+    <field name="search_query" type="string" indexed="true" stored="true" />
 
     <!-- Additional fields for sentiment analysis results -->
     <field name="sentiment" type="string" indexed="true" stored="true" />
@@ -43,13 +43,14 @@
     <!-- Copy fields for searching -->
     <copyField source="title" dest="text_all"/>
     <copyField source="text" dest="text_all"/>
+    <copyField source="description" dest="text_all"/>
     <copyField source="text" dest="text_ngrams"/>
     <copyField source="title" dest="_text_"/>
     <copyField source="text" dest="_text_"/>
+    <copyField source="description" dest="_text_"/>
     <copyField source="author" dest="_text_"/>
     <copyField source="platform" dest="_text_"/>
-    <copyField source="hashtags" dest="_text_"/>
-    <copyField source="mentions" dest="_text_"/>
+    <copyField source="source_name" dest="_text_"/>
     <copyField source="topics" dest="_text_"/>
     <copyField source="entities" dest="_text_"/>
 

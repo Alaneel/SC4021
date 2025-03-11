@@ -1,13 +1,13 @@
 # EV Opinion Search Engine
 
-A comprehensive search engine for analyzing and exploring opinions about electric vehicles from social media platforms.
+A comprehensive search engine for analyzing and exploring opinions about electric vehicles from news sources worldwide.
 
 ## Overview
 
 The EV Opinion Search Engine is a specialized tool for collecting, analyzing, and searching public opinions about electric vehicles. It combines web crawling, information retrieval, sentiment analysis, and topic modeling to provide a complete solution for understanding consumer perceptions of EVs.
 
 Key features:
-- Crawls and collects EV-related opinions from X (Twitter)
+- Crawls and collects EV-related articles from news sources via News API
 - Indexes content for fast and efficient searching
 - Analyzes sentiment (positive, negative, neutral)
 - Identifies topics and entities mentioned in opinions
@@ -23,7 +23,7 @@ SC4021/
 │   └── solr_schema.xml   # Solr schema definition
 │
 ├── crawler/              # Data collection module
-│   ├── x_crawler.py      # X (Twitter) data collector
+│   ├── newsapi_crawler.py # News API data collector
 │   └── data_cleaner.py   # Text cleaning utilities
 │
 ├── indexing/             # Search indexing module
@@ -59,7 +59,7 @@ SC4021/
 
 - Python 3.8 or higher
 - Apache Solr 8.11 or higher
-- X (Twitter) API credentials
+- News API key (free tier available)
 
 ### Setup
 
@@ -83,16 +83,13 @@ SC4021/
 4. Download required models:
    ```bash
    python -m spacy download en_core_web_sm
+   python -m nltk.downloader punkt
    ```
 
 5. Set up environment variables:
    ```bash
-   # X (Twitter) API credentials (required for crawler)
-   export X_BEARER_TOKEN="your_bearer_token"
-   export X_API_KEY="your_api_key"
-   export X_API_SECRET="your_api_secret"
-   export X_ACCESS_TOKEN="your_access_token"
-   export X_ACCESS_SECRET="your_access_secret"
+   # News API credentials (required for crawler)
+   export NEWSAPI_API_KEY="your_api_key"
    
    # Solr configuration (optional, defaults provided)
    export SOLR_URL="http://localhost:8983/solr"
@@ -107,7 +104,7 @@ SC4021/
 
 ### Data Collection
 
-To crawl EV opinions from X (Twitter):
+To crawl EV opinions from news sources:
 
 ```bash
 python scripts/run_crawler.py --limit 100 --preprocess
@@ -115,10 +112,12 @@ python scripts/run_crawler.py --limit 100 --preprocess
 
 Options:
 - `--queries`: Specify search queries (default: from config)
-- `--limit`: Maximum tweets per query (default: 100)
+- `--limit`: Maximum articles per query (default: 100)
+- `--days`: Number of days to look back (default: 30)
+- `--language`: Language of articles (default: en)
 - `--preprocess`: Apply text preprocessing to clean the data
 - `--output`: Specify output file name
-- `--bearer-token`: Specify X Bearer Token (or use environment variable)
+- `--api-key`: Specify News API Key (or use environment variable)
 
 ### Indexing
 
@@ -183,25 +182,25 @@ The web interface provides:
 - Interactive word clouds
 - Filtering by sentiment, date, source, topics, and entities
 
-## X API Usage and Limits
+## News API Usage and Limits
 
-When using the X API for data collection, be aware of the following:
+When using the News API for data collection, be aware of the following:
 
-1. **Rate Limits**: X API has rate limits that restrict the number of requests you can make in a certain time period (typically 300-900 requests per 15-minute window depending on your access level).
+1. **Rate Limits**: News API free tier allows 100 requests per day with up to 100 results per request, which is sufficient for collecting around 10,000 articles daily.
 
-2. **Access Tiers**: X offers different access tiers (Essential, Elevated, Academic) that determine your rate limits and data access. Check your Developer Portal for your current access level.
+2. **Data Timeframe**: Free tier access limits searches to articles published in the last month only.
 
-3. **Search Limitations**: The standard search API only returns tweets from the past 7 days. Historical data requires Academic Access.
+3. **Search Limitations**: Some filtering capabilities (like by source domain or language) may be limited compared to the paid tier.
 
-4. **Content Filtering**: Some content may be filtered by X's own algorithms.
+4. **Attribution Requirements**: When displaying news content, proper attribution to the source is required according to News API terms of service.
 
-The crawler includes automatic rate limit handling with backoff strategies to prevent API lockouts.
+The crawler includes automatic rate limit handling and will save intermediate results to prevent data loss if limits are reached.
 
 ## Development
 
 ### Adding New Data Sources
 
-To add a new data source, create a new crawler in the `crawler` module following the pattern established by `x_crawler.py`.
+To add a new data source, create a new crawler in the `crawler` module following the pattern established by `newsapi_crawler.py`.
 
 ### Extending Classification
 
@@ -219,4 +218,4 @@ To add new classification capabilities:
 - This project uses the Transformers library by Hugging Face for sentiment analysis
 - Topic modeling is implemented using Gensim
 - Web interface built with Flask and Bootstrap
-- X API access through Tweepy
+- News API for data collection

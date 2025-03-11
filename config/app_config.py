@@ -16,15 +16,11 @@ MODELS_DIR = os.path.join(BASE_DIR, 'classification', 'models')
 for directory in [DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, EVALUATION_DIR, MODELS_DIR]:
     os.makedirs(directory, exist_ok=True)
 
-# X (Twitter) API Configuration
-X_API_KEY = os.environ.get('X_API_KEY', '')
-X_API_SECRET = os.environ.get('X_API_SECRET', '')
-X_BEARER_TOKEN = os.environ.get('X_BEARER_TOKEN', '')
-X_ACCESS_TOKEN = os.environ.get('X_ACCESS_TOKEN', '')
-X_ACCESS_SECRET = os.environ.get('X_ACCESS_SECRET', '')
-X_USER_AGENT = os.environ.get('X_USER_AGENT', 'EV Opinion Search Engine v1.0')
+# News API Configuration
+NEWSAPI_API_KEY = os.environ.get('NEWSAPI_API_KEY', 'bc80b232d04549109cb27d021fd7c6bb')
+NEWSAPI_ENDPOINT = 'https://newsapi.org/v2/everything'
 
-# Search queries for X
+# Search queries for news articles about electric vehicles
 SEARCH_QUERIES = [
     "electric vehicle", "EV", "Tesla", "Rivian", "Lucid Motors", "Bolt EV",
     "Nissan Leaf", "EV charging", "electric car", "battery range",
@@ -47,3 +43,10 @@ FLASK_DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() in ('true', '1', 't'
 SENTIMENT_MODEL = "distilbert-base-uncased-finetuned-sst-2-english"
 NUM_TOPICS = 15
 SENTIMENT_THRESHOLD = 0.6  # Threshold for positive/negative classification
+
+# News API crawling configuration
+NEWSAPI_DAYS_BACK = 30  # How many days back to search from the end date
+NEWSAPI_MAX_RESULTS_PER_QUERY = 100  # Maximum articles per query
+NEWSAPI_LANGUAGE = 'en'  # Language of articles to retrieve
+NEWSAPI_END_DATE = "2025-02-09"  # Fixed end date that works with free tier
+NEWSAPI_START_DATE = "2025-01-10"  # Fixed start date (30 days before end date)

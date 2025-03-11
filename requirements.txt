@@ -4,8 +4,9 @@ numpy==1.24.3
 tqdm==4.65.0
 
 # Crawler
-tweepy==4.14.0
 requests==2.31.0
+beautifulsoup4==4.12.2
+nltk==3.8.1
 
 # Web interface
 flask==2.3.2
