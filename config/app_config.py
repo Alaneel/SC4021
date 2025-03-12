@@ -3,6 +3,7 @@ Application configuration parameters for EV Opinion Search Engine
 """
 import os
 from pathlib import Path
+from secret import key
 
 # Project paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,7 +18,7 @@ for directory in [DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, EVALUATION_DIR, MO
     os.makedirs(directory, exist_ok=True)
 
 # News API Configuration
-NEWSAPI_API_KEY = os.environ.get('NEWSAPI_API_KEY', 'bc80b232d04549109cb27d021fd7c6bb')
+NEWSAPI_API_KEY = os.environ.get('NEWSAPI_API_KEY', key)
 NEWSAPI_ENDPOINT = 'https://newsapi.org/v2/everything'
 
 # Search queries for news articles about electric vehicles
