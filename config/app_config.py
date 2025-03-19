@@ -3,7 +3,7 @@ Application configuration parameters for EV Opinion Search Engine
 """
 import os
 from pathlib import Path
-from secret import key
+from config.secret import key
 
 # Project paths
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -6,6 +6,7 @@ import pysolr
 import json
 import time
 import os
+import numpy as np
 import logging
 from tqdm import tqdm
 import sys
@@ -90,31 +91,20 @@ class SolrIndexer:
         return df
 
     def _ensure_list(self, value):
-        """Ensure value is a proper list for Solr"""
-        if pd.isna(value) or value is None:
+        # Return an empty list if value is None.
+        if value is None:
             return []
-
+        # If value is not a scalar and not a string, treat it as an iterable.
+        if not np.isscalar(value) and not isinstance(value, str):
+            return list(value)
+        # Use pd.isna only on scalar values.
+        if pd.isna(value):
+            return []
+        # If value is already a list, return it.
         if isinstance(value, list):
             return value
-
-        # Try to convert from string representation of list
-        if isinstance(value, str):
-            try:
-                result = eval(value)
-                if isinstance(result, list):
-                    return result
-            except:
-                pass
-
-            # Try comma-separated format
-            if ',' in value:
-                return [item.strip() for item in value.split(',')]
-
-            # Single value
-            return [value]
-
-        # Default: wrap in list
-        return [str(value)]
+        # Otherwise, wrap the scalar value in a list.
+        return [value]
 
     def index_dataframe(self, df, batch_size=500):
         """
