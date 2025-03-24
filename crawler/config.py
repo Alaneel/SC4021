@@ -23,9 +23,9 @@ TWITTER_QUERIES = [
 ]
 
 # Output file paths
-REDDIT_OUTPUT_CSV = "reddit_streaming_data.csv"
-TWITTER_OUTPUT_CSV = "twitter_streaming_data.csv"
-COMBINED_OUTPUT_CSV = "streaming_opinions_dataset.csv"
+REDDIT_OUTPUT_CSV = "../data/reddit_streaming_data.csv"
+TWITTER_OUTPUT_CSV = "../data/twitter_streaming_data.csv"
+COMBINED_OUTPUT_CSV = "../data/streaming_opinions_dataset.csv"
 
 # Streaming platforms for detection
 STREAMING_PLATFORMS = {

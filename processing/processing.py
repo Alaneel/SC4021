@@ -192,7 +192,7 @@ if __name__ == "__main__":
     processor = DataProcessor()
 
     # Load raw data
-    raw_df = processor.load_data("streaming_opinions_dataset.csv")
+    raw_df = processor.load_data("../data/streaming_opinions_dataset.csv")
 
     # Preprocess data
     processed_df = processor.preprocess_data(raw_df)
@@ -211,4 +211,4 @@ if __name__ == "__main__":
             print(value)
 
     # Save processed data
-    processor.save_processed_data(deduplicated_df, "processed_streaming_opinions.csv")
+    processor.save_processed_data(deduplicated_df, "../data/processed_streaming_opinions.csv")
