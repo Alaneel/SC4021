@@ -34,12 +34,12 @@
             </span>
             {% endif %}
 
-            {% if doc.sentiment_score %}
+            {% if doc.sentiment_score is defined and doc.sentiment_score is not none and doc.sentiment_score is number %}
             <span class="badge bg-info">
-                Sentiment score: {{ doc.sentiment_score|round(2) }}
+                Sentiment score: {{ "%.2f"|format(doc.sentiment_score) }}
             </span>
             {% endif %}
-            
+
             {% if doc.word_count %}
             <span class="badge bg-secondary">
                 Words: {{ doc.word_count }}
@@ -51,10 +51,10 @@
         <div class="mb-4">
             <h5>Original Content:</h5>
             <div class="p-3 bg-light rounded">
-                {{ doc.text|replace('\n', '<br>')|safe }}
+                {{ doc.text|replace('\n', '<br>')|safe if doc.text else "No content available" }}
             </div>
         </div>
-        
+
         <!-- Full Text if available -->
         {% if doc.full_text and doc.full_text != doc.text %}
         <div class="mb-4">
@@ -64,7 +64,7 @@
             </div>
         </div>
         {% endif %}
-        
+
         <!-- Cleaned Text if available -->
         {% if doc.cleaned_text and doc.cleaned_text != doc.text %}
         <div class="mb-4">
@@ -84,63 +84,63 @@
                             <th>Author</th>
                             <td>{{ doc.author }}</td>
                         </tr>
-                        
+
                         {% if doc.subreddit %}
                         <tr>
                             <th>Subreddit</th>
                             <td>{{ doc.subreddit }}</td>
                         </tr>
                         {% endif %}
-                        
+
                         {% if doc.source and doc.source != doc.subreddit %}
                         <tr>
                             <th>Source</th>
                             <td>{{ doc.source }}</td>
                         </tr>
                         {% endif %}
-                        
+
                         {% if doc.permalink %}
                         <tr>
                             <th>Link</th>
                             <td><a href="https://reddit.com{{ doc.permalink }}" target="_blank">View on Reddit</a></td>
                         </tr>
                         {% endif %}
-                        
+
                         {% if doc.created_at %}
                         <tr>
                             <th>Date</th>
                             <td>{{ doc.created_at|replace('T', ' ')|replace('Z', '') }}</td>
                         </tr>
                         {% endif %}
-                        
+
                         {% if doc.score %}
                         <tr>
                             <th>Score</th>
                             <td>{{ doc.score }}</td>
                         </tr>
                         {% endif %}
-                        
+
                         {% if doc.num_comments %}
                         <tr>
                             <th>Comments</th>
                             <td>{{ doc.num_comments }}</td>
                         </tr>
                         {% endif %}
-                        
+
                         {% if doc.is_duplicate is defined %}
                         <tr>
                             <th>Is Duplicate</th>
                             <td>{{ doc.is_duplicate }}</td>
                         </tr>
                         {% endif %}
-                        
-                        {% if doc.subjectivity_score %}
+
+                        {% if doc.subjectivity_score is defined and doc.subjectivity_score is not none and doc.subjectivity_score is number %}
                         <tr>
                             <th>Subjectivity</th>
-                            <td>{{ doc.subjectivity_score|round(2) }}</td>
+                            <td>{{ "%.2f"|format(doc.subjectivity_score) }}</td>
                         </tr>
                         {% endif %}
-                        
+
                         {% if doc.parent_id %}
                         <tr>
                             <th>Parent ID</th>
@@ -151,85 +151,85 @@
                 </table>
             </div>
 
-            {% if doc.content_quality or doc.pricing or doc.ui_ux or doc.technical or doc.customer_service %}
+            {% if doc.content_quality is defined or doc.pricing is defined or doc.ui_ux is defined or doc.technical is defined or doc.customer_service is defined %}
             <div class="col-md-6">
                 <h5>Feature Analysis:</h5>
                 <table class="table table-bordered">
                     <tbody>
-                        {% if doc.content_quality %}
+                        {% if doc.content_quality is defined and doc.content_quality is not none and doc.content_quality is number %}
                         <tr>
                             <th>Content Quality</th>
                             <td>
                                 <div class="progress">
-                                    <div class="progress-bar bg-success" role="progressbar" 
-                                         style="width: {{ (doc.content_quality * 100)|round }}%;" 
-                                         aria-valuenow="{{ doc.content_quality|round(2) }}" 
+                                    <div class="progress-bar bg-success" role="progressbar"
+                                         style="width: {{ "%.0f"|format(doc.content_quality * 100) }}%;"
+                                         aria-valuenow="{{ "%.2f"|format(doc.content_quality) }}"
                                          aria-valuemin="0" aria-valuemax="1">
-                                        {{ doc.content_quality|round(2) }}
+                                        {{ "%.2f"|format(doc.content_quality) }}
                                     </div>
                                 </div>
                             </td>
                         </tr>
                         {% endif %}
-                        
-                        {% if doc.pricing %}
+
+                        {% if doc.pricing is defined and doc.pricing is not none and doc.pricing is number %}
                         <tr>
                             <th>Pricing</th>
                             <td>
                                 <div class="progress">
-                                    <div class="progress-bar bg-info" role="progressbar" 
-                                         style="width: {{ (doc.pricing * 100)|round }}%;" 
-                                         aria-valuenow="{{ doc.pricing|round(2) }}" 
+                                    <div class="progress-bar bg-info" role="progressbar"
+                                         style="width: {{ "%.0f"|format(doc.pricing * 100) }}%;"
+                                         aria-valuenow="{{ "%.2f"|format(doc.pricing) }}"
                                          aria-valuemin="0" aria-valuemax="1">
-                                        {{ doc.pricing|round(2) }}
+                                        {{ "%.2f"|format(doc.pricing) }}
                                     </div>
                                 </div>
                             </td>
                         </tr>
                         {% endif %}
-                        
-                        {% if doc.ui_ux %}
+
+                        {% if doc.ui_ux is defined and doc.ui_ux is not none and doc.ui_ux is number %}
                         <tr>
                             <th>User Interface</th>
                             <td>
                                 <div class="progress">
-                                    <div class="progress-bar bg-warning" role="progressbar" 
-                                         style="width: {{ (doc.ui_ux * 100)|round }}%;" 
-                                         aria-valuenow="{{ doc.ui_ux|round(2) }}" 
+                                    <div class="progress-bar bg-warning" role="progressbar"
+                                         style="width: {{ "%.0f"|format(doc.ui_ux * 100) }}%;"
+                                         aria-valuenow="{{ "%.2f"|format(doc.ui_ux) }}"
                                          aria-valuemin="0" aria-valuemax="1">
-                                        {{ doc.ui_ux|round(2) }}
+                                        {{ "%.2f"|format(doc.ui_ux) }}
                                     </div>
                                 </div>
                             </td>
                         </tr>
                         {% endif %}
-                        
-                        {% if doc.technical %}
+
+                        {% if doc.technical is defined and doc.technical is not none and doc.technical is number %}
                         <tr>
                             <th>Technical Performance</th>
                             <td>
                                 <div class="progress">
-                                    <div class="progress-bar bg-danger" role="progressbar" 
-                                         style="width: {{ (doc.technical * 100)|round }}%;" 
-                                         aria-valuenow="{{ doc.technical|round(2) }}" 
+                                    <div class="progress-bar bg-danger" role="progressbar"
+                                         style="width: {{ "%.0f"|format(doc.technical * 100) }}%;"
+                                         aria-valuenow="{{ "%.2f"|format(doc.technical) }}"
                                          aria-valuemin="0" aria-valuemax="1">
-                                        {{ doc.technical|round(2) }}
+                                        {{ "%.2f"|format(doc.technical) }}
                                     </div>
                                 </div>
                             </td>
                         </tr>
                         {% endif %}
-                        
-                        {% if doc.customer_service %}
+
+                        {% if doc.customer_service is defined and doc.customer_service is not none and doc.customer_service is number %}
                         <tr>
                             <th>Customer Service</th>
                             <td>
                                 <div class="progress">
-                                    <div class="progress-bar bg-primary" role="progressbar" 
-                                         style="width: {{ (doc.customer_service * 100)|round }}%;" 
-                                         aria-valuenow="{{ doc.customer_service|round(2) }}" 
+                                    <div class="progress-bar bg-primary" role="progressbar"
+                                         style="width: {{ "%.0f"|format(doc.customer_service * 100) }}%;"
+                                         aria-valuenow="{{ "%.2f"|format(doc.customer_service) }}"
                                          aria-valuemin="0" aria-valuemax="1">
-                                        {{ doc.customer_service|round(2) }}
+                                        {{ "%.2f"|format(doc.customer_service) }}
                                     </div>
                                 </div>
                             </td>
