@@ -1,0 +1,127 @@
+<!-- templates/index.html -->
+{% extends 'base.html' %}
+
+{% block title %}Streaming Opinion Search{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="text-center mb-0">Search Streaming Service Opinions</h2>
+            </div>
+            <div class="card-body">
+                <form action="/search" method="get">
+                    <div class="mb-3">
+                        <label for="q" class="form-label">Search Query</label>
+                        <input type="text" class="form-control form-control-lg" id="q" name="q" placeholder="Enter keywords (e.g., Netflix price increase, Disney+ content)">
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="platform" class="form-label">Platform</label>
+                            <select class="form-select" id="platform" name="platform">
+                                <option value="">All Platforms</option>
+                                {% for platform in platforms %}
+                                <option value="{{ platform }}">{{ platform }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="type" class="form-label">Content Type</label>
+                            <select class="form-select" id="type" name="type">
+                                <option value="">All Types</option>
+                                {% for type in content_types %}
+                                <option value="{{ type }}">{{ type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="sentiment" class="form-label">Sentiment</label>
+                            <select class="form-select" id="sentiment" name="sentiment">
+                                <option value="">All Sentiments</option>
+                                <option value="positive">Positive</option>
+                                <option value="negative">Negative</option>
+                                <option value="neutral">Neutral</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="feature" class="form-label">Feature Focus</label>
+                            <select class="form-select" id="feature" name="feature">
+                                <option value="any">Any Feature</option>
+                                <option value="content_quality">Content Quality</option>
+                                <option value="pricing">Pricing</option>
+                                <option value="ui_ux">UI/UX</option>
+                                <option value="technical">Technical</option>
+                                <option value="customer_service">Customer Service</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="start_date" class="form-label">From Date</label>
+                            <input type="date" class="form-control datepicker" id="start_date" name="start_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="end_date" class="form-label">To Date</label>
+                            <input type="date" class="form-control datepicker" id="end_date" name="end_date">
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">Search</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0">Popular Searches</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item"><a href="/search?q=netflix+price+increase&platform=netflix&feature=pricing">Netflix price increase</a></li>
+                            <li class="list-group-item"><a href="/search?q=disney+plus+content&platform=disney%2B&feature=content_quality">Disney+ content quality</a></li>
+                            <li class="list-group-item"><a href="/search?q=streaming+buffering+issues&feature=technical">Streaming technical issues</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item"><a href="/search?q=hbo+max+user+interface&platform=hbo+max&feature=ui_ux">HBO Max user interface</a></li>
+                            <li class="list-group-item"><a href="/search?q=cancel+subscription&sentiment=negative">Subscription cancellations</a></li>
+                            <li class="list-group-item"><a href="/search?q=support+customer+service&feature=customer_service">Customer service experiences</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Dataset Overview</h4>
+            </div>
+            <div class="card-body">
+                <p>This search engine indexes streaming service opinions from Reddit and other platforms. The dataset includes:</p>
+                <ul>
+                    <li>Comments and posts from streaming service subreddits</li>
+                    <li>Sentiment analysis (positive, negative, neutral)</li>
+                    <li>Feature-specific ratings (content quality, pricing, UI/UX, technical performance, customer service)</li>
+                    <li>Keywords and entity extraction</li>
+                    <li>Post metadata (author, date, score, etc.)</li>
+                </ul>
+                <p>Use the search filters to explore opinions about specific streaming platforms, features, or sentiments.</p>
+                <div class="text-center">
+                    <a href="/search?q=*:*" class="btn btn-primary">Browse All Data</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
