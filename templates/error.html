@@ -1,0 +1,16 @@
+<!-- templates/error.html -->
+{% extends 'base.html' %}
+
+{% block title %}Error{% endblock %}
+
+{% block content %}
+<div class="alert alert-danger">
+    <h4 class="alert-heading">Error</h4>
+    <p>{{ message }}</p>
+    <hr>
+    <p class="mb-0">
+        <a href="javascript:history.back()" class="btn btn-outline-danger">Go Back</a>
+        <a href="/" class="btn btn-outline-primary">Home</a>
+    </p>
+</div>
+{% endblock %}

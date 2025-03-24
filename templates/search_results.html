@@ -1,0 +1,350 @@
+<!-- templates/search_results.html -->
+{% extends 'base.html' %}
+
+{% block title %}Search Results{% endblock %}
+
+{% block head %}
+{{ super() }}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Search filters sidebar -->
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Filter Results</h5>
+            </div>
+            <div class="card-body">
+                <form action="/search" method="get">
+                    <input type="hidden" name="q" value="{{ query }}">
+                    
+                    <div class="mb-3">
+                        <label for="platform" class="form-label">Platform</label>
+                        <select class="form-select" id="platform" name="platform">
+                            <option value="">All Platforms</option>
+                            {% for platform in platforms %}
+                            <option value="{{ platform }}" {% if platform == selected_platform %}selected{% endif %}>{{ platform }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="type" class="form-label">Content Type</label>
+                        <select class="form-select" id="type" name="type">
+                            <option value="">All Types</option>
+                            {% for type in content_types %}
+                            <option value="{{ type }}" {% if type == selected_type %}selected{% endif %}>{{ type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="sentiment" class="form-label">Sentiment</label>
+                        <select class="form-select" id="sentiment" name="sentiment">
+                            <option value="">All Sentiments</option>
+                            <option value="positive" {% if selected_sentiment == 'positive' %}selected{% endif %}>Positive</option>
+                            <option value="negative" {% if selected_sentiment == 'negative' %}selected{% endif %}>Negative</option>
+                            <option value="neutral" {% if selected_sentiment == 'neutral' %}selected{% endif %}>Neutral</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="feature" class="form-label">Feature Focus</label>
+                        <select class="form-select" id="feature" name="feature">
+                            <option value="any" {% if selected_feature == 'any' or not selected_feature %}selected{% endif %}>Any Feature</option>
+                            {% for feature in features %}
+                            {% if feature.id != 'any' %}
+                            <option value="{{ feature.id }}" {% if feature.id == selected_feature %}selected{% endif %}>{{ feature.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">From Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">To Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">Quick Searches</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item"><a href="/search?q=subscription+price">Subscription Pricing</a></li>
+                    <li class="list-group-item"><a href="/search?q=user+interface">User Interface</a></li>
+                    <li class="list-group-item"><a href="/search?q=streaming+quality">Streaming Quality</a></li>
+                    <li class="list-group-item"><a href="/search?q=customer+service">Customer Service</a></li>
+                    <li class="list-group-item"><a href="/search?q=content+library">Content Library</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main content -->
+    <div class="col-md-9">
+        <!-- Search results header -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Search Results</h4>
+                <div>
+                    <span class="badge bg-light text-dark">{{ num_found }} results found</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5>Query: <small class="text-muted">{{ query if query != '*:*' else 'All Documents' }}</small></h5>
+                        <div>
+                            {% if selected_platform %}
+                            <span class="badge bg-info me-1">Platform: {{ selected_platform }}</span>
+                            {% endif %}
+                            
+                            {% if selected_type %}
+                            <span class="badge bg-dark me-1">Type: {{ selected_type }}</span>
+                            {% endif %}
+                            
+                            {% if selected_sentiment %}
+                            <span class="badge 
+                                  {% if selected_sentiment == 'positive' %}bg-success
+                                  {% elif selected_sentiment == 'negative' %}bg-danger
+                                  {% else %}bg-secondary{% endif %} me-1">
+                                Sentiment: {{ selected_sentiment }}
+                            </span>
+                            {% endif %}
+                            
+                            {% if selected_feature and selected_feature != 'any' %}
+                            <span class="badge bg-primary me-1">Feature: {{ selected_feature }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        <a href="/" class="btn btn-outline-secondary">New Search</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visualizations -->
+        {% if visualizations %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Data Visualizations</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="visualizationTabs" role="tablist">
+                    {% if visualizations.platform_pie %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="platform-tab" data-bs-toggle="tab" data-bs-target="#platform" type="button" role="tab" aria-controls="platform" aria-selected="true">Platforms</button>
+                    </li>
+                    {% endif %}
+                    
+                    {% if visualizations.type_pie %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if not visualizations.platform_pie %}active{% endif %}" id="type-tab" data-bs-toggle="tab" data-bs-target="#type" type="button" role="tab" aria-controls="type" aria-selected="{% if not visualizations.platform_pie %}true{% else %}false{% endif %}">Content Types</button>
+                    </li>
+                    {% endif %}
+                    
+                    {% if visualizations.sentiment_bar %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if not visualizations.platform_pie and not visualizations.type_pie %}active{% endif %}" id="sentiment-tab" data-bs-toggle="tab" data-bs-target="#sentiment" type="button" role="tab" aria-controls="sentiment" aria-selected="{% if not visualizations.platform_pie and not visualizations.type_pie %}true{% else %}false{% endif %}">Sentiment</button>
+                    </li>
+                    {% endif %}
+                    
+                    {% if visualizations.time_series %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}active{% endif %}" id="time-tab" data-bs-toggle="tab" data-bs-target="#time" type="button" role="tab" aria-controls="time" aria-selected="{% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}true{% else %}false{% endif %}">Timeline</button>
+                    </li>
+                    {% endif %}
+                </ul>
+                
+                <div class="tab-content pt-3" id="visualizationTabContent">
+                    {% if visualizations.platform_pie %}
+                    <div class="tab-pane fade show active" id="platform" role="tabpanel" aria-labelledby="platform-tab">
+                        <div id="platform-chart" style="width:100%; height:400px;"></div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if visualizations.type_pie %}
+                    <div class="tab-pane fade {% if not visualizations.platform_pie %}show active{% endif %}" id="type" role="tabpanel" aria-labelledby="type-tab">
+                        <div id="type-chart" style="width:100%; height:400px;"></div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if visualizations.sentiment_bar %}
+                    <div class="tab-pane fade {% if not visualizations.platform_pie and not visualizations.type_pie %}show active{% endif %}" id="sentiment" role="tabpanel" aria-labelledby="sentiment-tab">
+                        <div id="sentiment-chart" style="width:100%; height:400px;"></div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if visualizations.time_series %}
+                    <div class="tab-pane fade {% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}show active{% endif %}" id="time" role="tabpanel" aria-labelledby="time-tab">
+                        <div id="time-chart" style="width:100%; height:400px;"></div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Search results -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Documents ({{ start + 1 }}-{{ start + results|length }} of {{ num_found }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for doc in results %}
+                    <div class="list-group-item p-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h5 class="mb-1">
+                                <a href="/document/{{ doc.id }}">
+                                    {% if doc.title %}
+                                        {{ doc.title }}
+                                    {% elif doc.text and doc.text|length > 100 %}
+                                        {{ doc.text[:100] }}...
+                                    {% else %}
+                                        Document ID: {{ doc.id }}
+                                    {% endif %}
+                                </a>
+                            </h5>
+                            <div>
+                                {% if doc.platform %}
+                                <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '') }}">
+                                    {{ doc.platform }}
+                                </span>
+                                {% endif %}
+                                
+                                {% if doc.type %}
+                                <span class="badge bg-dark">
+                                    {{ doc.type }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <p class="mb-1">
+                            {% if doc.text %}
+                                {% if doc.text|length > 300 %}
+                                    {{ doc.text[:300] }}...
+                                {% else %}
+                                    {{ doc.text }}
+                                {% endif %}
+                            {% endif %}
+                        </p>
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div>
+                                {% if doc.sentiment %}
+                                <span class="badge {% if doc.sentiment == 'positive' %}bg-success{% elif doc.sentiment == 'negative' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                    {{ doc.sentiment }}
+                                </span>
+                                {% endif %}
+                                
+                                {% if doc.created_at %}
+                                <small class="text-muted ms-2">{{ doc.created_at|replace('T', ' ')|replace('Z', '') }}</small>
+                                {% endif %}
+                                
+                                {% if doc.score %}
+                                <small class="text-muted ms-2">Score: {{ doc.score }}</small>
+                                {% endif %}
+                                
+                                {% if doc.author %}
+                                <small class="text-muted ms-2">by: {{ doc.author }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <div>
+                                {% if doc.content_quality or doc.pricing or doc.ui_ux or doc.technical or doc.customer_service %}
+                                <span class="badge bg-info" title="Has feature analysis">
+                                    <i class="bi bi-graph-up"></i> Analysis
+                                </span>
+                                {% endif %}
+                                
+                                <a href="/document/{{ doc.id }}" class="btn btn-sm btn-outline-primary ms-2">View Details</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            {% if num_found > rows %}
+            <div class="card-footer">
+                <nav aria-label="Search result pagination">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if start > 0 %}
+                        <li class="page-item">
+                            <a class="page-link" href="/search?q={{ query }}&start={{ start - rows }}&rows={{ rows }}{% if selected_platform %}&platform={{ selected_platform }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">Previous</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Previous</span>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page in range((num_found // rows) + 1) %}
+                        {% if page < 10 %}  <!-- Limit to first 10 pages to avoid huge pagination -->
+                        <li class="page-item {% if page * rows == start %}active{% endif %}">
+                            <a class="page-link" href="/search?q={{ query }}&start={{ page * rows }}&rows={{ rows }}{% if selected_platform %}&platform={{ selected_platform }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">{{ page + 1 }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if start + rows < num_found %}
+                        <li class="page-item">
+                            <a class="page-link" href="/search?q={{ query }}&start={{ start + rows }}&rows={{ rows }}{% if selected_platform %}&platform={{ selected_platform }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">Next</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Next</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if visualizations %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if visualizations.platform_pie %}
+        const platformChart = JSON.parse('{{ visualizations.platform_pie|safe }}');
+        Plotly.newPlot('platform-chart', platformChart.data, platformChart.layout);
+        {% endif %}
+        
+        {% if visualizations.type_pie %}
+        const typeChart = JSON.parse('{{ visualizations.type_pie|safe }}');
+        Plotly.newPlot('type-chart', typeChart.data, typeChart.layout);
+        {% endif %}
+        
+        {% if visualizations.sentiment_bar %}
+        const sentimentChart = JSON.parse('{{ visualizations.sentiment_bar|safe }}');
+        Plotly.newPlot('sentiment-chart', sentimentChart.data, sentimentChart.layout);
+        {% endif %}
+        
+        {% if visualizations.time_series %}
+        const timeChart = JSON.parse('{{ visualizations.time_series|safe }}');
+        Plotly.newPlot('time-chart', timeChart.data, timeChart.layout);
+        {% endif %}
+    });
+</script>
+{% endif %}
+{% endblock %}

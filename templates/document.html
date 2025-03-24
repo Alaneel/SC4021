@@ -1,0 +1,301 @@
+<!-- templates/document.html -->
+{% extends 'base.html' %}
+
+{% block title %}Document Detail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            {% if doc.title %}
+                {{ doc.title }}
+            {% else %}
+                Document ID: {{ doc.id }}
+            {% endif %}
+        </h4>
+    </div>
+    <div class="card-body">
+        <div class="mb-4">
+            {% if doc.platform %}
+            <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '') }}">
+                {{ doc.platform }}
+            </span>
+            {% endif %}
+
+            {% if doc.type %}
+            <span class="badge bg-dark">
+                {{ doc.type }}
+            </span>
+            {% endif %}
+
+            {% if doc.sentiment %}
+            <span class="badge {% if doc.sentiment == 'positive' %}bg-success{% elif doc.sentiment == 'negative' %}bg-danger{% else %}bg-secondary{% endif %}">
+                {{ doc.sentiment }}
+            </span>
+            {% endif %}
+
+            {% if doc.sentiment_score %}
+            <span class="badge bg-info">
+                Sentiment score: {{ doc.sentiment_score|round(2) }}
+            </span>
+            {% endif %}
+            
+            {% if doc.word_count %}
+            <span class="badge bg-secondary">
+                Words: {{ doc.word_count }}
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Original Text -->
+        <div class="mb-4">
+            <h5>Original Content:</h5>
+            <div class="p-3 bg-light rounded">
+                {{ doc.text|replace('\n', '<br>')|safe }}
+            </div>
+        </div>
+        
+        <!-- Full Text if available -->
+        {% if doc.full_text and doc.full_text != doc.text %}
+        <div class="mb-4">
+            <h5>Full Content:</h5>
+            <div class="p-3 bg-light rounded">
+                {{ doc.full_text|replace('\n', '<br>')|safe }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Cleaned Text if available -->
+        {% if doc.cleaned_text and doc.cleaned_text != doc.text %}
+        <div class="mb-4">
+            <h5>Cleaned Content:</h5>
+            <div class="p-3 bg-light rounded">
+                {{ doc.cleaned_text|replace('\n', '<br>')|safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-md-6">
+                <h5>Document Details:</h5>
+                <table class="table table-bordered">
+                    <tbody>
+                        <tr>
+                            <th>Author</th>
+                            <td>{{ doc.author }}</td>
+                        </tr>
+                        
+                        {% if doc.subreddit %}
+                        <tr>
+                            <th>Subreddit</th>
+                            <td>{{ doc.subreddit }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.source and doc.source != doc.subreddit %}
+                        <tr>
+                            <th>Source</th>
+                            <td>{{ doc.source }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.permalink %}
+                        <tr>
+                            <th>Link</th>
+                            <td><a href="https://reddit.com{{ doc.permalink }}" target="_blank">View on Reddit</a></td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.created_at %}
+                        <tr>
+                            <th>Date</th>
+                            <td>{{ doc.created_at|replace('T', ' ')|replace('Z', '') }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.score %}
+                        <tr>
+                            <th>Score</th>
+                            <td>{{ doc.score }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.num_comments %}
+                        <tr>
+                            <th>Comments</th>
+                            <td>{{ doc.num_comments }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.is_duplicate is defined %}
+                        <tr>
+                            <th>Is Duplicate</th>
+                            <td>{{ doc.is_duplicate }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.subjectivity_score %}
+                        <tr>
+                            <th>Subjectivity</th>
+                            <td>{{ doc.subjectivity_score|round(2) }}</td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.parent_id %}
+                        <tr>
+                            <th>Parent ID</th>
+                            <td>{{ doc.parent_id }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if doc.content_quality or doc.pricing or doc.ui_ux or doc.technical or doc.customer_service %}
+            <div class="col-md-6">
+                <h5>Feature Analysis:</h5>
+                <table class="table table-bordered">
+                    <tbody>
+                        {% if doc.content_quality %}
+                        <tr>
+                            <th>Content Quality</th>
+                            <td>
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {{ (doc.content_quality * 100)|round }}%;" 
+                                         aria-valuenow="{{ doc.content_quality|round(2) }}" 
+                                         aria-valuemin="0" aria-valuemax="1">
+                                        {{ doc.content_quality|round(2) }}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.pricing %}
+                        <tr>
+                            <th>Pricing</th>
+                            <td>
+                                <div class="progress">
+                                    <div class="progress-bar bg-info" role="progressbar" 
+                                         style="width: {{ (doc.pricing * 100)|round }}%;" 
+                                         aria-valuenow="{{ doc.pricing|round(2) }}" 
+                                         aria-valuemin="0" aria-valuemax="1">
+                                        {{ doc.pricing|round(2) }}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.ui_ux %}
+                        <tr>
+                            <th>User Interface</th>
+                            <td>
+                                <div class="progress">
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         style="width: {{ (doc.ui_ux * 100)|round }}%;" 
+                                         aria-valuenow="{{ doc.ui_ux|round(2) }}" 
+                                         aria-valuemin="0" aria-valuemax="1">
+                                        {{ doc.ui_ux|round(2) }}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.technical %}
+                        <tr>
+                            <th>Technical Performance</th>
+                            <td>
+                                <div class="progress">
+                                    <div class="progress-bar bg-danger" role="progressbar" 
+                                         style="width: {{ (doc.technical * 100)|round }}%;" 
+                                         aria-valuenow="{{ doc.technical|round(2) }}" 
+                                         aria-valuemin="0" aria-valuemax="1">
+                                        {{ doc.technical|round(2) }}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        
+                        {% if doc.customer_service %}
+                        <tr>
+                            <th>Customer Service</th>
+                            <td>
+                                <div class="progress">
+                                    <div class="progress-bar bg-primary" role="progressbar" 
+                                         style="width: {{ (doc.customer_service * 100)|round }}%;" 
+                                         aria-valuenow="{{ doc.customer_service|round(2) }}" 
+                                         aria-valuemin="0" aria-valuemax="1">
+                                        {{ doc.customer_service|round(2) }}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Parent/Related content -->
+        {% if related_docs and related_docs|length > 0 %}
+        <div class="mt-4">
+            <h5>Related Content:</h5>
+            {% for related in related_docs %}
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">
+                    {% if related.title %}
+                        {{ related.title }}
+                    {% else %}
+                        Parent Document
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <p>{{ related.text }}</p>
+                </div>
+                <div class="card-footer">
+                    <a href="/document/{{ related.id }}" class="btn btn-sm btn-outline-primary">View Details</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Entity and Keyword Analysis -->
+        {% if keywords or entities %}
+        <div class="mt-4">
+            <div class="row">
+                {% if keywords and keywords|length > 0 %}
+                <div class="col-md-6">
+                    <h5>Keywords:</h5>
+                    <div>
+                        {% for keyword in keywords %}
+                        <span class="badge bg-primary me-1 mb-1">{{ keyword }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if entities and entities|length > 0 %}
+                <div class="col-md-6">
+                    <h5>Entities:</h5>
+                    <div>
+                        {% for entity in entities %}
+                        <span class="badge bg-secondary me-1 mb-1">{{ entity }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="card-footer">
+        <a href="javascript:history.back()" class="btn btn-secondary">Back to Results</a>
+    </div>
+</div>
+{% endblock %}
