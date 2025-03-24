@@ -1,15 +1,21 @@
+# crawlers.py
+"""Social media crawler classes for Reddit and Twitter."""
+
 import praw
 import tweepy
 import pandas as pd
-import re
 import time
 import json
 from datetime import datetime
 from tqdm import tqdm
+from config import STREAMING_PLATFORMS
 
 
 class RedditCrawler:
+    """Class for crawling Reddit posts and comments related to streaming services."""
+
     def __init__(self, client_id, client_secret, user_agent):
+        """Initialize the Reddit crawler with API credentials."""
         self.reddit = praw.Reddit(
             client_id=client_id,
             client_secret=client_secret,
@@ -18,7 +24,14 @@ class RedditCrawler:
         self.data = []
 
     def crawl_subreddit(self, subreddit_name, limit=1000, search_query=None):
-        """Crawl posts and comments from a subreddit"""
+        """
+        Crawl posts and comments from a subreddit.
+
+        Args:
+            subreddit_name (str): Name of the subreddit to crawl
+            limit (int): Maximum number of posts to retrieve
+            search_query (str, optional): Search query to filter posts
+        """
         subreddit = self.reddit.subreddit(subreddit_name)
 
         if search_query:
@@ -66,27 +79,32 @@ class RedditCrawler:
                 self.data.append(comment_data)
 
     def _detect_streaming_platform(self, text):
-        """Detect which streaming platform is being discussed"""
-        platforms = {
-            'netflix': ['netflix', 'netflix\'s'],
-            'disney+': ['disney+', 'disney plus', 'disneyplus'],
-            'hbo max': ['hbo max', 'hbomax', 'hbo'],
-            'amazon prime': ['amazon prime', 'prime video', 'primevideo'],
-            'hulu': ['hulu', 'hulu\'s'],
-            'apple tv+': ['apple tv+', 'apple tv plus', 'appletv+'],
-            'peacock': ['peacock'],
-            'paramount+': ['paramount+', 'paramount plus']
-        }
+        """
+        Detect which streaming platform is being discussed in the text.
 
+        Args:
+            text (str): Text to analyze
+
+        Returns:
+            str: Detected platform name or 'general' if none found
+        """
         text = text.lower()
-        for platform, keywords in platforms.items():
+        for platform, keywords in STREAMING_PLATFORMS.items():
             for keyword in keywords:
                 if keyword in text:
                     return platform
         return 'general'  # If no specific platform is mentioned
 
     def save_to_csv(self, filename):
-        """Save crawled data to CSV file"""
+        """
+        Save crawled data to CSV file.
+
+        Args:
+            filename (str): Path to save the CSV file
+
+        Returns:
+            DataFrame: Pandas DataFrame of the saved data
+        """
         df = pd.DataFrame(self.data)
         df.drop_duplicates(subset=['id'], inplace=True)
         df.to_csv(filename, index=False)
@@ -94,19 +112,40 @@ class RedditCrawler:
         return df
 
     def save_to_json(self, filename):
-        """Save crawled data to JSON file"""
+        """
+        Save crawled data to JSON file.
+
+        Args:
+            filename (str): Path to save the JSON file
+        """
         with open(filename, 'w') as f:
             json.dump(self.data, f)
         print(f"Saved {len(self.data)} records to {filename}")
 
 
 class TwitterCrawler:
+    """Class for crawling Twitter posts related to streaming services."""
+
     def __init__(self, consumer_key, consumer_secret, access_token, access_token_secret, bearer_token):
-        self.client = tweepy.Client(consumer_key=consumer_key, consumer_secret=consumer_secret, access_token=access_token, access_token_secret=access_token_secret, bearer_token=bearer_token)
+        """Initialize the Twitter crawler with API credentials."""
+        self.client = tweepy.Client(
+            consumer_key=consumer_key,
+            consumer_secret=consumer_secret,
+            access_token=access_token,
+            access_token_secret=access_token_secret,
+            bearer_token=bearer_token
+        )
         self.data = []
 
     def crawl_tweets(self, query, max_results=100, limit=5000):
-        """Crawl tweets matching the query"""
+        """
+        Crawl tweets matching the query.
+
+        Args:
+            query (str): Search query for tweets
+            max_results (int): Maximum results per API call
+            limit (int): Total maximum number of tweets to retrieve
+        """
         total_crawled = 0
         next_token = None
 
@@ -163,78 +202,64 @@ class TwitterCrawler:
         print(f"Crawled {len(self.data)} tweets for query: {query}")
 
     def _detect_streaming_platform(self, text):
-        """Detect which streaming platform is being discussed"""
-        platforms = {
-            'netflix': ['netflix', 'netflix\'s'],
-            'disney+': ['disney+', 'disney plus', 'disneyplus'],
-            'hbo max': ['hbo max', 'hbomax', 'hbo'],
-            'amazon prime': ['amazon prime', 'prime video', 'primevideo'],
-            'hulu': ['hulu', 'hulu\'s'],
-            'apple tv+': ['apple tv+', 'apple tv plus', 'appletv+'],
-            'peacock': ['peacock'],
-            'paramount+': ['paramount+', 'paramount plus']
-        }
+        """
+        Detect which streaming platform is being discussed in the text.
 
+        Args:
+            text (str): Text to analyze
+
+        Returns:
+            str: Detected platform name or 'general' if none found
+        """
         text = text.lower()
-        for platform, keywords in platforms.items():
+        for platform, keywords in STREAMING_PLATFORMS.items():
             for keyword in keywords:
                 if keyword in text:
                     return platform
         return 'general'  # If no specific platform is mentioned
 
     def save_to_csv(self, filename):
-        """Save crawled data to CSV file"""
+        """
+        Save crawled data to CSV file.
+
+        Args:
+            filename (str): Path to save the CSV file
+
+        Returns:
+            DataFrame: Pandas DataFrame of the saved data
+        """
         df = pd.DataFrame(self.data)
         df.to_csv(filename, index=False)
         print(f"Saved {len(df)} records to {filename}")
         return df
 
     def save_to_json(self, filename):
-        """Save crawled data to JSON file"""
+        """
+        Save crawled data to JSON file.
+
+        Args:
+            filename (str): Path to save the JSON file
+        """
         with open(filename, 'w') as f:
             json.dump(self.data, f)
         print(f"Saved {len(self.data)} records to {filename}")
 
 
-# Example usage
-if __name__ == "__main__":
-    # Reddit crawler
-    reddit_crawler = RedditCrawler(
-        client_id="2dKydEu9_1-1CJlfrCZh2g",
-        client_secret="OYKcuCbwKItW9FYMDBDpj47sRCtvSQ",
-        user_agent="Streaming Opinion Crawler 1.0 by /u/YOUR_USERNAME"
-    )
+def combine_datasets(reddit_df, twitter_df=None, output_filename=None):
+    """
+    Combine Reddit and optional Twitter data into a single dataset.
 
-    # Crawl multiple subreddits
-    subreddits = ['Netflix', 'DisneyPlus', 'Hulu', 'PrimeVideo', 'cordcutters', 'StreamingBestOf']
-    for subreddit in subreddits:
-        reddit_crawler.crawl_subreddit(subreddit, limit=500)
+    Args:
+        reddit_df (DataFrame): DataFrame containing Reddit data
+        twitter_df (DataFrame, optional): DataFrame containing Twitter data
+        output_filename (str, optional): Path to save the combined CSV file
 
-    # Save Reddit data
-    reddit_df = reddit_crawler.save_to_csv("reddit_streaming_data.csv")
-
-    # Twitter crawler
-    twitter_crawler = TwitterCrawler(consumer_key="VLn3KSpVzQ0shTdYpgpzW6uve", consumer_secret="pcNTtNz8sy2kcDnGDlpAxHTqZCSPyJmgjKpHYs7g0ugy88kewY", access_token="1555001250973749254-bGQDqO8HQVgDSGtcjuMi6hUKERLbZ1", access_token_secret="xnxXHvJZZ7K7i9a1oczTJK9EUwX9AxCReu5sFjKXNw256", bearer_token="AAAAAAAAAAAAAAAAAAAAAFd%2BzwEAAAAA%2FoftOrNppA7OcW%2BTA88j6PjoYWg%3DuNWHCCf1uIGjgkIOJuGYUXtby9ji8DTC7N2QoM49Ff3sUvc8jz")
-
-    # Crawl tweets for different streaming services
-    queries = [
-        "Netflix review OR opinion OR thoughts -is:retweet",
-        "Disney+ review OR opinion OR thoughts -is:retweet",
-        "Hulu review OR opinion OR thoughts -is:retweet",
-        "HBO Max review OR opinion OR thoughts -is:retweet",
-        "Amazon Prime Video review OR opinion OR thoughts -is:retweet",
-        "Apple TV+ review OR opinion OR thoughts -is:retweet"
-    ]
-
-    for query in queries:
-        twitter_crawler.crawl_tweets(query, max_results=100, limit=1000)
-
-    # Save Twitter data
-    twitter_df = twitter_crawler.save_to_csv("twitter_streaming_data.csv")
-
-    # Combine data and save
+    Returns:
+        DataFrame: Combined dataset
+    """
     combined_data = []
 
+    # Process Reddit data
     for _, row in reddit_df.iterrows():
         combined_data.append({
             'id': f"reddit_{row['id']}",
@@ -246,17 +271,23 @@ if __name__ == "__main__":
             'score': row['score']
         })
 
-    for _, row in twitter_df.iterrows():
-        combined_data.append({
-            'id': f"twitter_{row['id']}",
-            'text': row['text'],
-            'title': "",
-            'created_at': row['created_at'],
-            'platform': row['platform'],
-            'source': 'twitter',
-            'score': row['like_count']
-        })
+    # Process Twitter data if provided
+    if twitter_df is not None:
+        for _, row in twitter_df.iterrows():
+            combined_data.append({
+                'id': f"twitter_{row['id']}",
+                'text': row['text'],
+                'title': "",
+                'created_at': row['created_at'],
+                'platform': row['platform'],
+                'source': 'twitter',
+                'score': row['like_count']
+            })
 
+    # Create and save combined DataFrame
     combined_df = pd.DataFrame(combined_data)
-    combined_df.to_csv("streaming_opinions_dataset.csv", index=False)
-    print(f"Saved combined dataset with {len(combined_df)} records")
+    if output_filename:
+        combined_df.to_csv(output_filename, index=False)
+        print(f"Saved combined dataset with {len(combined_df)} records to {output_filename}")
+
+    return combined_df
