@@ -160,24 +160,8 @@ def setup_crawler_credentials():
             print_info("Skipping credentials setup")
             return
 
-    # Template for credentials
-    template = """# credentials.py
-"""
-    API
-    credentials
-    for social media crawlers.
-
-
-IMPORTANT: Keep
-this
-file
-private and do
-not share or commit
-to
-version
-control.
-"""
-
+# Template for credentials
+template = """
 # Reddit API credentials
 # Create an app at https://www.reddit.com/prefs/apps
 REDDIT_CLIENT_ID = "{reddit_client_id}"
