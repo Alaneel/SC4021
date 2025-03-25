@@ -7,17 +7,31 @@ import pandas as pd
 import numpy as np
 import json
 import os
+import sys
+import logging
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 from tabulate import tabulate
 from datetime import datetime
 
+# Solr connection settings
+SOLR_URL = "http://localhost:8983/solr/streaming_opinions"
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 class PerformanceEvaluator:
     """Performance evaluation tool for the search and classification system."""
 
-    def __init__(self, solr_url="http://localhost:8983/solr/streaming_opinions"):
+    def __init__(self, solr_url=SOLR_URL):
         """
         Initialize the performance evaluator.
 
@@ -38,31 +52,19 @@ class PerformanceEvaluator:
             bool: True if connection is successful
         """
         try:
-            response = requests.get(f"{self.solr_url}/admin/ping", timeout=5)
+            response = requests.get(f"{SOLR_URL}/admin/ping", timeout=5)
             response.raise_for_status()
+            logger.info(f"Successfully connected to Solr at {SOLR_URL}")
 
-            # Check for Solr version and status
-            system_info_response = requests.get(f"{self.solr_url}/admin/info/system", timeout=5)
-            self.system_info = system_info_response.json().get('system', {})
-
-            # Get index info
-            index_response = requests.get(f"{self.solr_url}/admin/luke?numTerms=0", timeout=5)
-            index_info = index_response.json()
-
-            # Get schema fields
-            schema_response = requests.get(f"{self.solr_url}/schema/fields", timeout=5)
-            schema_info = schema_response.json()
-
-            # Add information to system_info
-            self.system_info['index'] = {
-                'num_docs': index_info.get('index', {}).get('numDocs', 0),
-                'max_doc': index_info.get('index', {}).get('maxDoc', 0),
-                'num_fields': len(schema_info.get('fields', []))
-            }
+            # Check if there are any documents
+            count_response = requests.get(f"{SOLR_URL}/select?q=*:*&rows=0&wt=json", timeout=5)
+            count_data = count_response.json()
+            doc_count = count_data.get("response", {}).get("numFound", 0)
+            logger.info(f"Found {doc_count} documents in Solr index")
 
             return True
         except Exception as e:
-            print(f"Error connecting to Solr: {e}")
+            logger.error(f"Failed to connect to Solr: {e}")
             return False
 
     def add_search_query(self, query, description, filters=None, rows=10):
