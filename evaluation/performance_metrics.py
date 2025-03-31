@@ -443,93 +443,114 @@ class PerformanceEvaluator:
         if any(k for k in self.performance_metrics.keys() if isinstance(k, int)):
             query_metrics = {k: v for k, v in self.performance_metrics.items() if isinstance(k, int)}
 
-            plt.figure(figsize=(12, 6))
+            # Filter out queries with None avg_time_ms values
+            valid_query_data = [(qid, metrics) for qid, metrics in query_metrics.items()
+                                if metrics['avg_time_ms'] is not None]
 
-            query_ids = list(query_metrics.keys())
-            avg_times = [metrics['avg_time_ms'] for metrics in query_metrics.values()]
-            query_descriptions = [metrics['description'] for metrics in query_metrics.values()]
+            if valid_query_data:  # Ensure we have at least one valid data point
+                plt.figure(figsize=(12, 6))
 
-            # Create the bar chart
-            bars = plt.bar(query_ids, avg_times)
+                query_ids = [qid for qid, _ in valid_query_data]
+                avg_times = [metrics['avg_time_ms'] for _, metrics in valid_query_data]
+                query_descriptions = [metrics['description'] for _, metrics in valid_query_data]
 
-            # Add data labels
-            for bar in bars:
-                height = bar.get_height()
-                plt.text(bar.get_x() + bar.get_width() / 2., height + 5,
-                         f"{height:.1f} ms", ha='center', va='bottom')
+                # Create the bar chart
+                bars = plt.bar(query_ids, avg_times)
 
-            plt.xlabel('Query ID')
-            plt.ylabel('Average Response Time (ms)')
-            plt.title('Query Performance')
-            plt.xticks(query_ids)
+                # Add data labels
+                for bar in bars:
+                    height = bar.get_height()
+                    plt.text(bar.get_x() + bar.get_width() / 2., height + 5,
+                             f"{height:.1f} ms", ha='center', va='bottom')
 
-            # Add a legend for query descriptions
-            legend_labels = [f"Query {q_id}: {desc}" for q_id, desc in zip(query_ids, query_descriptions)]
-            plt.legend(bars, legend_labels, loc='upper left', bbox_to_anchor=(1, 1))
+                plt.xlabel('Query ID')
+                plt.ylabel('Average Response Time (ms)')
+                plt.title('Query Performance')
+                plt.xticks(query_ids)
 
-            plt.tight_layout()
+                # Add a legend for query descriptions
+                legend_labels = [f"Query {q_id}: {desc}" for q_id, desc in zip(query_ids, query_descriptions)]
+                plt.legend(bars, legend_labels, loc='upper left', bbox_to_anchor=(1, 1))
 
-            query_perf_path = os.path.join(output_dir, 'query_performance.png')
-            plt.savefig(query_perf_path)
-            plt.close()
+                plt.tight_layout()
 
-            visualizations['query_performance'] = query_perf_path
+                query_perf_path = os.path.join(output_dir, 'query_performance.png')
+                plt.savefig(query_perf_path)
+                plt.close()
+
+                visualizations['query_performance'] = query_perf_path
+            else:
+                print("No valid query performance data to visualize")
 
         # Facet performance bar chart
         if 'facet_queries' in self.performance_metrics:
             facet_metrics = self.performance_metrics['facet_queries']
 
-            plt.figure(figsize=(12, 6))
+            # Filter out facets with None avg_time_ms values
+            valid_facet_data = [(f_type, metrics) for f_type, metrics in facet_metrics.items()
+                                if metrics['avg_time_ms'] is not None]
 
-            facet_types = list(facet_metrics.keys())
-            avg_times = [metrics['avg_time_ms'] for metrics in facet_metrics.values()]
+            if valid_facet_data:  # Ensure we have at least one valid data point
+                plt.figure(figsize=(12, 6))
 
-            # Create the bar chart
-            bars = plt.bar(facet_types, avg_times)
+                facet_types = [f_type for f_type, _ in valid_facet_data]
+                avg_times = [metrics['avg_time_ms'] for _, metrics in valid_facet_data]
 
-            # Add data labels
-            for bar in bars:
-                height = bar.get_height()
-                plt.text(bar.get_x() + bar.get_width() / 2., height + 5,
-                         f"{height:.1f} ms", ha='center', va='bottom')
+                # Create the bar chart
+                bars = plt.bar(facet_types, avg_times)
 
-            plt.xlabel('Facet Type')
-            plt.ylabel('Average Response Time (ms)')
-            plt.title('Facet Query Performance')
-            plt.xticks(rotation=45, ha='right')
+                # Add data labels
+                for bar in bars:
+                    height = bar.get_height()
+                    plt.text(bar.get_x() + bar.get_width() / 2., height + 5,
+                             f"{height:.1f} ms", ha='center', va='bottom')
 
-            plt.tight_layout()
+                plt.xlabel('Facet Type')
+                plt.ylabel('Average Response Time (ms)')
+                plt.title('Facet Query Performance')
+                plt.xticks(rotation=45, ha='right')
 
-            facet_perf_path = os.path.join(output_dir, 'facet_performance.png')
-            plt.savefig(facet_perf_path)
-            plt.close()
+                plt.tight_layout()
 
-            visualizations['facet_performance'] = facet_perf_path
+                facet_perf_path = os.path.join(output_dir, 'facet_performance.png')
+                plt.savefig(facet_perf_path)
+                plt.close()
+
+                visualizations['facet_performance'] = facet_perf_path
+            else:
+                print("No valid facet performance data to visualize")
 
         # Scalability line chart
         if 'scalability' in self.performance_metrics:
             scalability = self.performance_metrics['scalability']
 
-            plt.figure(figsize=(12, 6))
+            # Ensure there are no None values in the data
+            valid_indices = [i for i, (q, f) in enumerate(zip(scalability['query_times'], scalability['facet_times']))
+                             if q is not None and f is not None]
 
-            doc_counts = scalability['doc_counts']
-            query_times = scalability['query_times']
-            facet_times = scalability['facet_times']
+            if valid_indices:  # Ensure we have at least one valid data point
+                plt.figure(figsize=(12, 6))
 
-            plt.plot(doc_counts, query_times, marker='o', linestyle='-', label='Regular Query')
-            plt.plot(doc_counts, facet_times, marker='s', linestyle='-', label='Faceted Query')
+                doc_counts = [scalability['doc_counts'][i] for i in valid_indices]
+                query_times = [scalability['query_times'][i] for i in valid_indices]
+                facet_times = [scalability['facet_times'][i] for i in valid_indices]
 
-            plt.xlabel('Document Count')
-            plt.ylabel('Average Response Time (ms)')
-            plt.title('Scalability Performance')
-            plt.legend()
-            plt.grid(True, linestyle='--', alpha=0.7)
+                plt.plot(doc_counts, query_times, marker='o', linestyle='-', label='Regular Query')
+                plt.plot(doc_counts, facet_times, marker='s', linestyle='-', label='Faceted Query')
 
-            scalability_path = os.path.join(output_dir, 'scalability.png')
-            plt.savefig(scalability_path)
-            plt.close()
+                plt.xlabel('Document Count')
+                plt.ylabel('Average Response Time (ms)')
+                plt.title('Scalability Performance')
+                plt.legend()
+                plt.grid(True, linestyle='--', alpha=0.7)
 
-            visualizations['scalability'] = scalability_path
+                scalability_path = os.path.join(output_dir, 'scalability.png')
+                plt.savefig(scalability_path)
+                plt.close()
+
+                visualizations['scalability'] = scalability_path
+            else:
+                print("No valid scalability performance data to visualize")
 
         return visualizations
 
