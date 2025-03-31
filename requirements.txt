@@ -2,14 +2,9 @@
 pandas==1.5.3
 numpy==1.24.3
 tqdm==4.65.0
-faker==18.13.0  # Added for mock data generation
+faker==18.13.0
 
-# Crawler
-requests==2.31.0
-beautifulsoup4==4.12.2
-nltk==3.8.1
-
-# Web interface
+# Web Framework
 flask==2.3.2
 jinja2==3.1.2
 werkzeug==2.3.6
@@ -17,17 +12,34 @@ bootstrap-flask==2.2.0
 
 # Search & Indexing
 pysolr==3.9.0
+requests==2.31.0
 
-# Classification & NLP
-transformers==4.28.1
-torch==2.0.1
+# NLP & Text Processing
+nltk==3.8.1
 scikit-learn==1.2.2
 spacy==3.5.3
 gensim==4.3.1
+langdetect==1.0.9
+transformers==4.28.1
+torch==2.0.1
+
+# Social Media Data Collection
+praw==7.7.0
+tweepy==4.14.0
+beautifulsoup4==4.12.2
 
 # Visualization
 matplotlib==3.7.1
 seaborn==0.12.2
 wordcloud==1.9.2
+plotly==5.17.0
+tabulate==0.9.0
 
-# Download spaCy model with: python -m spacy download en_core_web_sm
+# Testing & Evaluation
+coverage==7.2.7
+
+# To install spaCy model, run:
+# python -m spacy download en_core_web_sm
+
+# To install NLTK data, run:
+# python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet'); nltk.download('vader_lexicon'); nltk.download('averaged_perceptron_tagger'); nltk.download('maxent_ne_chunker'); nltk.download('words')"
