@@ -2,217 +2,421 @@ import pandas as pd
 import numpy as np
 import re
 import nltk
+import os
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import precision_recall_fscore_support, accuracy_score, classification_report
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score, classification_report, confusion_matrix
 from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import FunctionTransformer, StandardScaler, OneHotEncoder
+from sklearn.feature_selection import SelectKBest, f_classif
 import matplotlib.pyplot as plt
 import seaborn as sns
 from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
 import time
-import os
 import warnings
+from imblearn.over_sampling import SMOTE
+from collections import defaultdict, Counter
 
-warnings.filterwarnings('ignore')
+# Suppress warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 # Download necessary NLTK resources
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('wordnet')
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
+nltk.download('wordnet', quiet=True)
 
 
 # 1. DATA LOADING AND PREPROCESSING
 def load_data(file_path):
-    """Load the Netflix dataset from CSV"""
+    """Load the pre-annotated dataset"""
     df = pd.read_csv(file_path)
-    print(f"Loaded dataset with {len(df)} records")
+    print(f"Loaded pre-annotated dataset with {len(df)} records")
+
+    # Check for platform column and handle missing values
+    if 'platform' not in df.columns or df['platform'].isnull().all():
+        print("Warning: No platform information found. Creating generic platform value.")
+        df['platform'] = 'generic'
+    else:
+        # Fill missing platform values
+        df['platform'] = df['platform'].fillna('unknown')
+
+    # Display platform distribution
+    platform_counts = df['platform'].value_counts()
+    print("\nPlatform distribution:")
+    for platform, count in platform_counts.items():
+        print(f"  {platform}: {count} ({count / len(df) * 100:.2f}%)")
+
     return df
 
 
 def preprocess_text(text):
     """Clean and preprocess text data"""
-    if isinstance(text, str):
-        # Convert to lowercase
-        text = text.lower()
-        # Remove URLs
-        text = re.sub(r'http\S+', '', text)
-        # Remove special characters and numbers
-        text = re.sub(r'[^\w\s]', '', text)
-        text = re.sub(r'\d+', '', text)
-        # Tokenize
-        tokens = word_tokenize(text)
-        # Remove stopwords
-        stop_words = set(stopwords.words('english'))
-        tokens = [word for word in tokens if word not in stop_words]
-        # Lemmatize
-        lemmatizer = WordNetLemmatizer()
-        tokens = [lemmatizer.lemmatize(word) for word in tokens]
-        # Join tokens back into text
-        return ' '.join(tokens)
-    return ''
+    if not isinstance(text, str):
+        return ''
+
+    # Convert to lowercase
+    text = text.lower()
+    # Remove URLs
+    text = re.sub(r'http\S+', '', text)
+    # Remove special characters and numbers
+    text = re.sub(r'[^\w\s]', '', text)
+    text = re.sub(r'\d+', '', text)
+    # Tokenize
+    tokens = word_tokenize(text)
+    # Remove stopwords
+    stop_words = set(stopwords.words('english'))
+    tokens = [word for word in tokens if word not in stop_words]
+    # Lemmatize
+    lemmatizer = WordNetLemmatizer()
+    tokens = [lemmatizer.lemmatize(word) for word in tokens]
+    # Join tokens back into text
+    return ' '.join(tokens)
 
 
 def prepare_data(df):
-    """Prepare dataset for analysis"""
+    """Prepare dataset for analysis using pre-annotated data"""
     # Combine title and text for submissions
     df['content'] = df.apply(
         lambda row: f"{row['title']} {row['text']}" if row['type'] == 'submission' else row['text'],
         axis=1
     )
 
+    # Drop rows with NaN in the content or manual_sentiment
+    df = df.dropna(subset=['content', 'manual_sentiment'])
+
     # Preprocess the content
     print("Preprocessing text data...")
     df['processed_content'] = df['content'].apply(preprocess_text)
 
+    # Convert manual_sentiment to binary (assuming 'positive' and 'negative' values)
+    df['sentiment_binary'] = df['manual_sentiment'].apply(lambda x: 1 if x == 'positive' else 0)
+
+    # Create aspect binary flags from manual annotations
+    aspect_columns = ['manual_content_quality', 'manual_pricing', 'manual_ui_ux',
+                      'manual_technical', 'manual_customer_service']
+
+    # Check the data type of aspect columns
+    for col in aspect_columns:
+        if col in df.columns:
+            # If numeric, convert to binary based on threshold
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[f"{col}_binary"] = df[col].apply(lambda x: 1 if x > 0 else 0)
+            else:
+                # For categorical aspects, assume binary already
+                df[f"{col}_binary"] = df[col]
+
     return df
 
 
-# 2. SUBJECTIVITY DETECTION (Semantics Layer)
-def train_subjectivity_classifier(df_train):
-    """Train a classifier to detect subjective vs objective content"""
-    # Create labels based on score (higher score = more subjective/opinionated)
-    median_score = df_train['score'].median()
-    df_train['subjective'] = (df_train['score'] > median_score).astype(int)
+# 2. PLATFORM-SPECIFIC FEATURE ENGINEERING
+def extract_platform_features(df):
+    """Extract platform-specific features"""
+    # Get unique platforms
+    platforms = df['platform'].unique().tolist()
 
-    # Split data
-    X = df_train['processed_content']
-    y = df_train['subjective']
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+    print(f"Detected platforms: {', '.join(platforms)}")
 
-    # Create and train pipeline
-    subjectivity_pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(max_features=5000)),
-        ('classifier', LogisticRegression(max_iter=1000))
-    ])
+    # Create platform indicator features
+    for platform in platforms:
+        platform_col_name = f'platform_{platform.lower().replace(" ", "_")}'
+        df[platform_col_name] = (df['platform'] == platform).astype(int)
 
-    print("Training subjectivity classifier...")
-    start_time = time.time()
-    subjectivity_pipeline.fit(X_train, y_train)
-    train_time = time.time() - start_time
-
-    # Evaluate
-    y_pred = subjectivity_pipeline.predict(X_val)
-    precision, recall, f1, _ = precision_recall_fscore_support(y_val, y_pred, average='binary')
-    accuracy = accuracy_score(y_val, y_pred)
-
-    print(f"Subjectivity Classification Results:")
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall: {recall:.4f}")
-    print(f"F1 Score: {f1:.4f}")
-    print(f"Training Time: {train_time:.2f} seconds")
-
-    return subjectivity_pipeline
-
-
-# 3. SENTIMENT ANALYSIS (Semantics Layer)
-def train_sentiment_classifier(df_train):
-    """Train a classifier to detect sentiment polarity"""
-    # Simple lexicon-based sentiment assignment for initial labeling
-    positive_words = ['good', 'great', 'excellent', 'amazing', 'love', 'like', 'best']
-    negative_words = ['bad', 'terrible', 'awful', 'hate', 'dislike', 'worst', 'ads', 'unsubscribe']
-
-    def assign_sentiment(text):
-        if not isinstance(text, str):
-            return 0
-        text = text.lower()
-        pos_count = sum(1 for word in positive_words if word in text)
-        neg_count = sum(1 for word in negative_words if word in text)
-
-        if pos_count > neg_count:
-            return 1  # Positive
-        elif neg_count > pos_count:
-            return -1  # Negative
-        else:
-            return 0  # Neutral
-
-    df_train['sentiment'] = df_train['content'].apply(assign_sentiment)
-
-    # For binary classification, convert to 0/1
-    df_train['positive_sentiment'] = (df_train['sentiment'] > 0).astype(int)
-
-    # Split data
-    X = df_train['processed_content']
-    y = df_train['positive_sentiment']
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # Create and train pipeline
-    sentiment_pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(max_features=5000)),
-        ('classifier', RandomForestClassifier(n_estimators=100, random_state=42))
-    ])
-
-    print("\nTraining sentiment classifier...")
-    start_time = time.time()
-    sentiment_pipeline.fit(X_train, y_train)
-    train_time = time.time() - start_time
-
-    # Evaluate
-    y_pred = sentiment_pipeline.predict(X_val)
-    precision, recall, f1, _ = precision_recall_fscore_support(y_val, y_pred, average='binary')
-    accuracy = accuracy_score(y_val, y_pred)
-
-    print(f"Sentiment Classification Results:")
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall: {recall:.4f}")
-    print(f"F1 Score: {f1:.4f}")
-    print(f"Training Time: {train_time:.2f} seconds")
-
-    return sentiment_pipeline
-
-
-# 4. ASPECT EXTRACTION (Pragmatics Layer)
-def extract_aspects(df):
-    """Extract aspects being discussed in the content"""
-    # Pre-defined list of aspects relevant to Netflix
-    netflix_aspects = {
-        'subscription': ['subscription', 'plan', 'pay', 'price', 'cost', 'fee', 'dollar', 'month', 'year'],
-        'ads': ['ad', 'ads', 'advertisement', 'commercial', 'promotion', 'advertise'],
-        'content': ['show', 'movie', 'series', 'film', 'program', 'documentary', 'watch', 'content'],
-        'user_experience': ['interface', 'app', 'application', 'navigation', 'autoplay', 'trailer', 'experience'],
-        'quality': ['quality', 'resolution', 'hd', '4k', 'stream', 'buffer', 'loading']
+    # Platform-specific keyword dictionaries
+    platform_keywords = {
+        'netflix': ['netflix', 'nflx', 'netflix original', 'reed hastings', 'stranger things', 'squid game'],
+        'apple_tv': ['apple tv', 'apple tv+', 'apple original', 'apple+', 'ted lasso', 'morning show'],
+        'disney': ['disney', 'disney+', 'disney plus', 'mandalorian', 'marvel', 'pixar'],
+        'hulu': ['hulu'],
+        'amazon': ['prime video', 'amazon prime', 'prime', 'jeff bezos'],
+        'hbo': ['hbo', 'hbo max', 'max', 'house of the dragon', 'game of thrones'],
+        'peacock': ['peacock', 'nbc'],
+        'paramount': ['paramount', 'paramount+', 'cbs'],
+        'general': ['streaming', 'subscription', 'platform']
     }
 
-    # Function to identify aspects in text
-    def identify_aspects(text):
-        if not isinstance(text, str):
-            return {}
+    # Add platform-specific keyword features for platforms that actually exist in our data
+    for platform_key, keywords in platform_keywords.items():
+        # Check if we have this platform or something similar
+        platform_exists = any(p.lower().replace(" ", "_") in platform_key or
+                              platform_key in p.lower().replace(" ", "_")
+                              for p in platforms)
 
-        text = text.lower()
-        aspects_found = {}
+        if platform_exists or platform_key == 'general':
+            keyword_pattern = '|'.join([re.escape(kw) for kw in keywords])
+            df[f'mentions_{platform_key}'] = df['content'].apply(
+                lambda x: 1 if isinstance(x, str) and re.search(keyword_pattern, x.lower()) else 0
+            )
 
-        for aspect, keywords in netflix_aspects.items():
-            mentions = sum(1 for keyword in keywords if keyword in text)
-            if mentions > 0:
-                aspects_found[aspect] = mentions
+    # Platform competition mentions (when a comment mentions multiple platforms)
+    mention_cols = [col for col in df.columns if col.startswith('mentions_') and col != 'mentions_general']
+    if mention_cols:
+        df['mentions_multiple_platforms'] = (df[mention_cols].sum(axis=1) > 1).astype(int)
 
-        return aspects_found
-
-    print("\nExtracting aspects from content...")
-    df['aspects'] = df['content'].apply(identify_aspects)
-
-    # Create binary columns for each aspect
-    for aspect in netflix_aspects.keys():
-        df[f'has_{aspect}'] = df['aspects'].apply(lambda x: 1 if aspect in x else 0)
-
-    # Count aspects
-    aspect_counts = {aspect: df[f'has_{aspect}'].sum() for aspect in netflix_aspects.keys()}
-
-    print("Aspect Counts in Dataset:")
-    for aspect, count in aspect_counts.items():
-        print(f"{aspect}: {count}")
+    # Print the platform-related columns we created
+    platform_cols = [col for col in df.columns if col.startswith('platform_')]
+    mention_cols = [col for col in df.columns if col.startswith('mentions_')]
+    print(f"Created {len(platform_cols)} platform indicator columns: {', '.join(platform_cols)}")
+    print(f"Created {len(mention_cols)} platform mention columns: {', '.join(mention_cols)}")
 
     return df
 
 
-# 5. TRANSFORMER-BASED SENTIMENT ANALYSIS
-def transformer_sentiment_analysis(df, sample_size=1000):
+# 3. ENHANCED FEATURE ENGINEERING
+def extract_features(df):
+    """Extract additional features from the text"""
+    # Length features
+    df['text_length'] = df['content'].apply(lambda x: len(str(x)))
+    df['word_count'] = df['content'].apply(lambda x: len(str(x).split()))
+
+    # General streaming service keywords
+    streaming_keywords = ['stream', 'subscription', 'series', 'show', 'movie', 'watch', 'binge', 'content', 'original']
+    for keyword in streaming_keywords:
+        df[f'has_{keyword}'] = df['content'].apply(lambda x: 1 if keyword in str(x).lower() else 0)
+
+    # Define aspect-related keywords
+    aspect_keywords = define_cross_platform_aspects()
+
+    for aspect, keywords in aspect_keywords.items():
+        df[f'kw_{aspect}'] = df['content'].apply(
+            lambda x: sum(1 for kw in keywords if kw in str(x).lower())
+        )
+
+    # Sentiment lexicon features
+    positive_words = ['good', 'great', 'excellent', 'amazing', 'love', 'like', 'best', 'awesome', 'worth', 'recommend']
+    negative_words = ['bad', 'terrible', 'awful', 'hate', 'dislike', 'worst', 'poor', 'waste', 'expensive', 'cancel']
+
+    df['positive_word_count'] = df['content'].apply(
+        lambda x: sum(1 for word in positive_words if word in str(x).lower())
+    )
+    df['negative_word_count'] = df['content'].apply(
+        lambda x: sum(1 for word in negative_words if word in str(x).lower())
+    )
+    df['sentiment_ratio'] = df.apply(
+        lambda row: row['positive_word_count'] / (row['negative_word_count'] + 1), axis=1
+    )
+
+    # Platform-specific features
+    df = extract_platform_features(df)
+
+    return df
+
+
+# Define cross-platform aspects
+def define_cross_platform_aspects():
+    """Define aspect keywords that work across streaming platforms"""
+    return {
+        'content_quality': [
+            'quality', 'content', 'show', 'movie', 'series', 'documentary',
+            'original', 'programming', 'catalog', 'library', 'selection'
+        ],
+        'pricing': [
+            'price', 'cost', 'subscription', 'fee', 'expensive', 'cheap',
+            'worth', 'pay', 'money', 'value', 'plan', 'tier'
+        ],
+        'ui_ux': [
+            'interface', 'design', 'ui', 'ux', 'navigation', 'search',
+            'find', 'browse', 'menu', 'layout', 'usability', 'app'
+        ],
+        'technical': [
+            'buffer', 'stream', 'load', 'quality', 'hd', '4k', 'resolution',
+            'error', 'bug', 'crash', 'playback', 'bandwidth', 'offline'
+        ],
+        'customer_service': [
+            'support', 'service', 'help', 'contact', 'response', 'customer',
+            'chat', 'email', 'refund', 'cancel', 'subscription'
+        ]
+    }
+
+
+# 4. MODEL BUILDING AND EVALUATION
+def build_sentiment_pipeline(model_type='rf', include_platform=True, available_columns=None):
+    """Build a pipeline for sentiment analysis"""
+    if model_type == 'lr':
+        classifier = LogisticRegression(max_iter=1000, class_weight='balanced')
+    elif model_type == 'nb':
+        classifier = MultinomialNB()
+    else:  # default to RandomForest
+        classifier = RandomForestClassifier(n_estimators=100, class_weight='balanced')
+
+    # Text features pipeline (will remain sparse)
+    text_pipeline = Pipeline([
+        ('tfidf', TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
+        ('selector', SelectKBest(f_classif, k=2000))
+    ])
+
+    # For manual features (will be scaled separately)
+    manual_features = Pipeline([
+        ('identity', FunctionTransformer(lambda x: x)),
+        ('scaler', StandardScaler())  # This scaler only applies to the manual features
+    ])
+
+    # Basic manual feature columns that should always be available
+    base_manual_cols = ['text_length', 'word_count', 'sentiment_ratio',
+                        'positive_word_count', 'negative_word_count']
+
+    # Verify all base columns exist in available_columns
+    if available_columns is not None:
+        base_manual_cols = [col for col in base_manual_cols if col in available_columns]
+
+        if not base_manual_cols:
+            raise ValueError("None of the expected manual feature columns were found in the data")
+
+    # Build transformer list
+    transformers = [
+        ('text_features', text_pipeline, 'processed_content'),
+        ('manual_features', manual_features, base_manual_cols)
+    ]
+
+    # Add platform features if requested and available
+    if include_platform and available_columns is not None:
+        # Dynamically find platform columns that exist in the data
+        platform_cols = [col for col in available_columns if col.startswith('platform_')]
+        mention_cols = [col for col in available_columns if col.startswith('mentions_')]
+
+        platform_feature_cols = platform_cols + mention_cols
+
+        if platform_feature_cols:
+            # Only add platform features if we actually have some
+            platform_transformer = Pipeline([
+                ('identity', FunctionTransformer(lambda x: x))
+            ])
+
+            transformers.append(('platform_features', platform_transformer, platform_feature_cols))
+            print(f"Including {len(platform_feature_cols)} platform-related features in the model")
+        else:
+            print("No platform-specific columns found in the data. Model will not include platform features.")
+
+    # Column transformer to combine feature sets
+    preprocessor = ColumnTransformer(transformers, remainder='drop')
+
+    # Final pipeline
+    pipeline = Pipeline([
+        ('preprocessor', preprocessor),
+        ('classifier', classifier)
+    ])
+
+    return pipeline
+
+
+def train_and_evaluate_model(X_train, X_test, y_train, y_test, model_type='rf',
+                             task='sentiment', include_platform=True, platform_stratified=False):
+    """Train and evaluate a model for the specified task"""
+    # Get list of available columns to pass to pipeline builder
+    available_columns = list(X_train.columns)
+
+    # Create pipeline with dynamic column detection
+    pipeline = build_sentiment_pipeline(model_type, include_platform, available_columns)
+
+    # For platform-stratified evaluation
+    if platform_stratified and 'platform' in X_train.columns:
+        metrics_by_platform = {}
+        platforms = X_train['platform'].unique()
+
+        for platform in platforms:
+            # Skip platforms with too few samples
+            platform_train_mask = (X_train['platform'] == platform)
+            platform_test_mask = (X_test['platform'] == platform)
+
+            if sum(platform_train_mask) < 30 or sum(platform_test_mask) < 30:
+                continue
+
+            # Train on all data but evaluate on platform-specific
+            pipeline.fit(X_train, y_train)
+
+            # Platform-specific evaluation
+            X_test_platform = X_test[platform_test_mask]
+            y_test_platform = y_test[platform_test_mask]
+
+            if len(X_test_platform) > 0:
+                y_pred_platform = pipeline.predict(X_test_platform)
+
+                # Calculate metrics
+                accuracy = accuracy_score(y_test_platform, y_pred_platform)
+                precision, recall, f1, _ = precision_recall_fscore_support(
+                    y_test_platform, y_pred_platform, average='binary'
+                )
+
+                metrics_by_platform[platform] = {
+                    'accuracy': accuracy,
+                    'precision': precision,
+                    'recall': recall,
+                    'f1': f1,
+                    'sample_size': len(X_test_platform)
+                }
+
+        # Overall metrics
+        pipeline.fit(X_train, y_train)
+        y_pred = pipeline.predict(X_test)
+    else:
+        # Standard training and evaluation
+        pipeline.fit(X_train, y_train)
+        y_pred = pipeline.predict(X_test)
+        metrics_by_platform = None
+
+    # Calculate overall metrics
+    accuracy = accuracy_score(y_test, y_pred)
+    precision, recall, f1, _ = precision_recall_fscore_support(y_test, y_pred, average='binary')
+
+    # Print results
+    print(f"\n{task.capitalize()} Classification with {model_type.upper()}:")
+    print(f"Overall Metrics:")
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1 Score: {f1:.4f}")
+
+    # Print platform-specific metrics if available
+    if metrics_by_platform:
+        print("\nPlatform-Specific Metrics:")
+        for platform, metrics in metrics_by_platform.items():
+            print(f"\n  {platform.upper()} (n={metrics['sample_size']}):")
+            print(f"  Accuracy: {metrics['accuracy']:.4f}")
+            print(f"  Precision: {metrics['precision']:.4f}")
+            print(f"  Recall: {metrics['recall']:.4f}")
+            print(f"  F1 Score: {metrics['f1']:.4f}")
+
+    # Confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+    print("\nConfusion Matrix:")
+    print(cm)
+
+    # Return metrics and the model
+    metrics = {
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'by_platform': metrics_by_platform
+    }
+
+    return pipeline, metrics
+
+
+def build_aspect_model(aspect_name, X_train, X_test, y_train, y_test, include_platform=True):
+    """Build and evaluate a model for a specific aspect"""
+    # Get list of available columns
+    available_columns = list(X_train.columns)
+
+    # Create a pipeline specific for this aspect with platform awareness
+    pipeline = build_sentiment_pipeline('rf', include_platform, available_columns)
+
+    # Train and evaluate
+    return train_and_evaluate_model(
+        X_train, X_test, y_train, y_test, 'rf', aspect_name, include_platform
+    )
+
+
+# 5. TRANSFORMER-BASED MODELS
+def transformer_sentiment_analysis(df, sample_size=1000, stratify_by_platform=True):
     """Use a pre-trained transformer model for sentiment analysis"""
     print("\nPerforming transformer-based sentiment analysis...")
 
@@ -221,14 +425,54 @@ def transformer_sentiment_analysis(df, sample_size=1000):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSequenceClassification.from_pretrained(model_name)
 
-    # Create sentiment analysis pipeline
-    sentiment_analyzer = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+    # Create sentiment analysis pipeline with truncation
+    sentiment_analyzer = pipeline(
+        "sentiment-analysis",
+        model=model,
+        tokenizer=tokenizer,
+        truncation=True,
+        max_length=512
+    )
 
-    # Take a sample for analysis (transformers can be slow on large datasets)
+    # Take a stratified sample for analysis
     if len(df) > sample_size:
-        df_sample = df.sample(sample_size, random_state=42)
+        if stratify_by_platform and 'platform' in df.columns:
+            # Stratified sampling to ensure representation of all platforms
+            sample_indices = []
+            platforms = df['platform'].unique()
+
+            for platform in platforms:
+                platform_indices = df[df['platform'] == platform].index.tolist()
+                # Calculate proportional sample size for this platform
+                platform_sample_size = min(
+                    int(sample_size * (len(platform_indices) / len(df))),
+                    len(platform_indices)
+                )
+
+                if platform_sample_size > 0:
+                    platform_sample = np.random.choice(
+                        platform_indices,
+                        size=platform_sample_size,
+                        replace=False
+                    )
+                    sample_indices.extend(platform_sample)
+
+            # If we didn't get enough samples, add more from the remaining data
+            if len(sample_indices) < sample_size:
+                remaining_indices = list(set(df.index) - set(sample_indices))
+                additional_samples = np.random.choice(
+                    remaining_indices,
+                    size=min(sample_size - len(sample_indices), len(remaining_indices)),
+                    replace=False
+                )
+                sample_indices.extend(additional_samples)
+
+            df_sample = df.loc[sample_indices]
+        else:
+            # Simple random sampling
+            df_sample = df.sample(sample_size, random_state=42)
     else:
-        df_sample = df
+        df_sample = df.copy()
 
     # Process the sample
     start_time = time.time()
@@ -237,171 +481,475 @@ def transformer_sentiment_analysis(df, sample_size=1000):
     batch_size = 32
     for i in range(0, len(df_sample), batch_size):
         batch = df_sample['content'].iloc[i:i + batch_size].tolist()
-        # Make sure all items are strings
-        batch = [str(text) if text is not None else "" for text in batch]
-        batch_results = sentiment_analyzer(batch)
-        results.extend(batch_results)
+        # Make sure all items are strings and truncate if needed
+        batch = [str(text)[:10000] if text is not None else "" for text in batch]  # Pre-truncate very long texts
+
+        try:
+            batch_results = sentiment_analyzer(batch)
+            results.extend(batch_results)
+        except Exception as e:
+            print(f"Error processing batch {i // batch_size}: {e}")
+            # For errors, assign neutral sentiment as fallback
+            batch_results = [{"label": "NEUTRAL", "score": 0.5} for _ in range(len(batch))]
+            results.extend(batch_results)
 
     process_time = time.time() - start_time
 
     # Convert results to a format we can use
     df_sample['transformer_sentiment'] = [1 if res['label'] == 'POSITIVE' else 0 for res in results]
 
-    # Compare with our simpler model if available
-    if 'positive_sentiment' in df_sample.columns:
-        agreement = (df_sample['transformer_sentiment'] == df_sample['positive_sentiment']).mean()
-        print(f"Agreement between simple model and transformer: {agreement:.4f}")
+    # Compare with manual annotations
+    agreement = (df_sample['transformer_sentiment'] == df_sample['sentiment_binary']).mean()
+    print(f"Agreement between transformer and manual annotations: {agreement:.4f}")
 
-    print(f"Transformer processing time for {len(df_sample)} samples: {process_time:.2f} seconds")
+    # Calculate metrics
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        df_sample['sentiment_binary'],
+        df_sample['transformer_sentiment'],
+        average='binary'
+    )
+
+    print(f"Transformer model metrics:")
+    print(f"Accuracy: {agreement:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1 Score: {f1:.4f}")
+    print(f"Processing time for {len(df_sample)} samples: {process_time:.2f} seconds")
     print(f"Processing speed: {len(df_sample) / process_time:.2f} samples/second")
 
-    # Count sentiment distribution
-    sentiment_counts = df_sample['transformer_sentiment'].value_counts()
-    print("\nTransformer Sentiment Distribution:")
-    print(f"Positive: {sentiment_counts.get(1, 0)} ({sentiment_counts.get(1, 0) / len(df_sample) * 100:.2f}%)")
-    print(f"Negative: {sentiment_counts.get(0, 0)} ({sentiment_counts.get(0, 0) / len(df_sample) * 100:.2f}%)")
+    # Platform-specific metrics if available
+    if 'platform' in df_sample.columns:
+        print("\nTransformer model metrics by platform:")
+        platforms = df_sample['platform'].unique()
 
-    return sentiment_analyzer
+        for platform in platforms:
+            platform_df = df_sample[df_sample['platform'] == platform]
+
+            if len(platform_df) >= 30:  # Only evaluate platforms with enough samples
+                platform_agreement = (platform_df['transformer_sentiment'] == platform_df['sentiment_binary']).mean()
+                platform_precision, platform_recall, platform_f1, _ = precision_recall_fscore_support(
+                    platform_df['sentiment_binary'],
+                    platform_df['transformer_sentiment'],
+                    average='binary'
+                )
+
+                print(f"\n  {platform.upper()} (n={len(platform_df)}):")
+                print(f"  Accuracy: {platform_agreement:.4f}")
+                print(f"  Precision: {platform_precision:.4f}")
+                print(f"  Recall: {platform_recall:.4f}")
+                print(f"  F1 Score: {platform_f1:.4f}")
+
+    # Confusion matrix
+    cm = confusion_matrix(df_sample['sentiment_binary'], df_sample['transformer_sentiment'])
+    print("\nConfusion Matrix:")
+    print(cm)
+
+    return sentiment_analyzer, {
+        'accuracy': agreement,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'speed': len(df_sample) / process_time
+    }
 
 
 # 6. ASPECT-BASED SENTIMENT ANALYSIS (ABSA)
-def perform_absa(df, sentiment_analyzer):
-    """Perform Aspect-Based Sentiment Analysis"""
+def perform_absa(df, sentiment_analyzer, by_platform=True):
+    """Perform Aspect-Based Sentiment Analysis using transformer model"""
     print("\nPerforming Aspect-Based Sentiment Analysis (ABSA)...")
 
-    # Get the aspects we identified earlier
-    aspects = ['subscription', 'ads', 'content', 'user_experience', 'quality']
+    # Get cross-platform aspect definitions
+    aspects = ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']
+    aspect_keywords = define_cross_platform_aspects()
+
+    # Ensure sentiment_analyzer has truncation enabled
+    if not hasattr(sentiment_analyzer, 'tokenizer') or not getattr(sentiment_analyzer.tokenizer, 'truncation', False):
+        print("Setting truncation for the sentiment analyzer in ABSA")
+        sentiment_analyzer.tokenizer.truncation = True
+        sentiment_analyzer.tokenizer.max_length = 512
 
     # Sample data for ABSA (for performance reasons)
     sample_size = min(500, len(df))
-    df_sample = df.sample(sample_size, random_state=42)
 
-    # Initialize results dictionary
-    absa_results = {aspect: {'positive': 0, 'negative': 0} for aspect in aspects}
+    # Stratified sampling by platform if requested
+    if by_platform and 'platform' in df.columns:
+        # Get platform distribution
+        platforms = df['platform'].unique()
+        platform_counts = df['platform'].value_counts()
+
+        # Calculate samples per platform
+        samples_per_platform = {}
+        for platform in platforms:
+            # Proportional allocation with minimum threshold
+            platform_sample = max(
+                int(sample_size * (platform_counts[platform] / len(df))),
+                min(30, platform_counts[platform]) if platform_counts[platform] > 0 else 0
+            )
+            samples_per_platform[platform] = platform_sample
+
+        # Sample from each platform
+        sample_dfs = []
+        for platform, count in samples_per_platform.items():
+            if count > 0:
+                platform_df = df[df['platform'] == platform]
+                if len(platform_df) >= count:
+                    sample_dfs.append(platform_df.sample(count, random_state=42))
+                else:
+                    sample_dfs.append(platform_df)  # Take all if fewer than requested
+
+        # Combine samples
+        df_sample = pd.concat(sample_dfs)
+    else:
+        # Simple random sampling
+        df_sample = df.sample(sample_size, random_state=42)
+
+    # Initialize results dictionaries
+    absa_results = {aspect: {'positive': 0, 'negative': 0, 'manual_agreement': 0, 'total': 0}
+                    for aspect in aspects}
+
+    # Also track by platform if requested
+    if by_platform and 'platform' in df.columns:
+        platforms = df_sample['platform'].unique()
+        absa_by_platform = {
+            platform: {
+                aspect: {'positive': 0, 'negative': 0, 'manual_agreement': 0, 'total': 0}
+                for aspect in aspects
+            } for platform in platforms
+        }
+    else:
+        absa_by_platform = None
 
     # For each record, analyze sentiment for each aspect mentioned
     for idx, row in df_sample.iterrows():
-        content = str(row['content']) if row['content'] is not None else ""
+        content = str(row['content']) if isinstance(row['content'], str) else ""
+        platform = row.get('platform', 'unknown') if 'platform' in df.columns else 'unknown'
 
         # Check which aspects are mentioned
         for aspect in aspects:
-            if row[f'has_{aspect}'] == 1:
+            aspect_col = f"manual_{aspect}"
+
+            # Skip if no manual annotation for this aspect
+            if aspect_col not in df.columns:
+                continue
+
+            # Check if the aspect is mentioned using keywords
+            is_mentioned = any(keyword in content.lower() for keyword in aspect_keywords[aspect])
+
+            if is_mentioned:
+                # Get the manual annotation
+                manual_sentiment = 1 if row[f"{aspect_col}_binary"] == 1 else 0
+
                 # Extract sentences mentioning the aspect
-                aspect_keywords = get_aspect_keywords(aspect)
                 sentences = re.split(r'[.!?]', content)
                 relevant_sentences = []
 
                 for sentence in sentences:
-                    if any(keyword in sentence.lower() for keyword in aspect_keywords):
+                    if any(keyword in sentence.lower() for keyword in aspect_keywords[aspect]):
                         relevant_sentences.append(sentence)
 
                 if relevant_sentences:
-                    # Join the relevant sentences
+                    # Join the relevant sentences (limit length to avoid truncation issues)
                     aspect_text = ' '.join(relevant_sentences)
+                    if len(aspect_text) > 5000:  # Pre-truncate very long texts
+                        aspect_text = aspect_text[:5000]
 
-                    # Analyze sentiment for this aspect
-                    sentiment_result = sentiment_analyzer([aspect_text])[0]
-                    sentiment = 'positive' if sentiment_result['label'] == 'POSITIVE' else 'negative'
+                    try:
+                        # Analyze sentiment for this aspect
+                        sentiment_result = sentiment_analyzer([aspect_text])[0]
+                        predicted_sentiment = 1 if sentiment_result['label'] == 'POSITIVE' else 0
+                    except Exception as e:
+                        print(f"Error analyzing aspect {aspect}: {e}")
+                        # Default to neutral in case of error
+                        predicted_sentiment = manual_sentiment  # Use manual annotation as fallback
 
-                    # Update counts
-                    absa_results[aspect][sentiment] += 1
+                    # Update overall counts
+                    absa_results[aspect]['total'] += 1
+                    if predicted_sentiment == 1:
+                        absa_results[aspect]['positive'] += 1
+                    else:
+                        absa_results[aspect]['negative'] += 1
+
+                    # Check agreement with manual annotation
+                    if predicted_sentiment == manual_sentiment:
+                        absa_results[aspect]['manual_agreement'] += 1
+
+                    # Update platform-specific counts if tracking
+                    if absa_by_platform is not None:
+                        if platform in absa_by_platform:
+                            absa_by_platform[platform][aspect]['total'] += 1
+                            if predicted_sentiment == 1:
+                                absa_by_platform[platform][aspect]['positive'] += 1
+                            else:
+                                absa_by_platform[platform][aspect]['negative'] += 1
+
+                            if predicted_sentiment == manual_sentiment:
+                                absa_by_platform[platform][aspect]['manual_agreement'] += 1
 
     # Calculate percentages and format results
     print("\nAspect-Based Sentiment Analysis Results:")
-    for aspect, sentiments in absa_results.items():
-        total = sentiments['positive'] + sentiments['negative']
+
+    for aspect, results in absa_results.items():
+        total = results['total']
         if total > 0:
-            pos_percent = sentiments['positive'] / total * 100
-            neg_percent = sentiments['negative'] / total * 100
+            pos_percent = results['positive'] / total * 100
+            neg_percent = results['negative'] / total * 100
+            agreement = results['manual_agreement'] / total * 100
+
             print(f"\n{aspect.capitalize()}:")
             print(f"  Mentioned in {total} samples")
-            print(f"  Positive: {sentiments['positive']} ({pos_percent:.2f}%)")
-            print(f"  Negative: {sentiments['negative']} ({neg_percent:.2f}%)")
+            print(f"  Positive: {results['positive']} ({pos_percent:.2f}%)")
+            print(f"  Negative: {results['negative']} ({neg_percent:.2f}%)")
+            print(f"  Agreement with manual annotations: {agreement:.2f}%")
         else:
             print(f"\n{aspect.capitalize()}: Not enough mentions for analysis")
 
-    return absa_results
+    # Print platform-specific ABSA results if available
+    if absa_by_platform:
+        print("\n\nPlatform-Specific Aspect Sentiment Analysis:")
+
+        for platform, platform_results in absa_by_platform.items():
+            print(f"\n{platform.upper()}:")
+
+            for aspect, aspect_results in platform_results.items():
+                total = aspect_results['total']
+
+                if total >= 5:  # Only report if we have enough samples
+                    pos_percent = aspect_results['positive'] / total * 100
+                    neg_percent = aspect_results['negative'] / total * 100
+
+                    print(f"  {aspect.capitalize()}:")
+                    print(f"    Mentioned in {total} samples")
+                    print(f"    Positive: {aspect_results['positive']} ({pos_percent:.2f}%)")
+                    print(f"    Negative: {aspect_results['negative']} ({neg_percent:.2f}%)")
+
+    return absa_results, absa_by_platform
 
 
-def get_aspect_keywords(aspect):
-    """Get keywords for a specific aspect"""
-    aspect_keywords = {
-        'subscription': ['subscription', 'plan', 'pay', 'price', 'cost', 'fee', '$', 'dollar', 'month', 'year'],
-        'ads': ['ad', 'ads', 'advertisement', 'commercial', 'promotion', 'advertise'],
-        'content': ['show', 'movie', 'series', 'film', 'program', 'documentary', 'watch', 'content'],
-        'user_experience': ['interface', 'app', 'application', 'navigation', 'autoplay', 'trailer', 'experience'],
-        'quality': ['quality', 'resolution', 'hd', '4k', 'stream', 'buffer', 'loading']
-    }
-    return aspect_keywords.get(aspect, [])
+# 7. PLATFORM COMPARISON ANALYSIS
+def compare_platforms(df, absa_results_by_platform):
+    """Compare sentiment across different platforms"""
+    print("\nPerforming cross-platform sentiment comparison...")
+
+    if 'platform' not in df.columns:
+        print("Cannot perform platform comparison: no platform column in dataset")
+        return None
+
+    platforms = df['platform'].unique()
+    platform_dfs = {platform: df[df['platform'] == platform] for platform in platforms}
+
+    # Calculate overall sentiment metrics per platform
+    platform_metrics = {}
+
+    for platform, platform_df in platform_dfs.items():
+        # Skip platforms with too few samples
+        if len(platform_df) < 30:
+            continue
+
+        # Overall sentiment stats
+        overall_sentiment = platform_df['sentiment_binary'].mean() * 100  # as percentage
+
+        # Aspect-specific sentiment summaries
+        aspect_sentiment = {}
+        for aspect in ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']:
+            aspect_col = f"manual_{aspect}_binary"
+            if aspect_col in platform_df.columns:
+                aspect_sentiment[aspect] = platform_df[aspect_col].mean() * 100  # as percentage
+
+        # Add to platform metrics
+        platform_metrics[platform] = {
+            'sample_size': len(platform_df),
+            'overall_positive': overall_sentiment,
+            'aspects': aspect_sentiment
+        }
+
+    # Print platform comparison
+    print("\nPlatform Comparison - Overall Positive Sentiment:")
+    for platform, metrics in platform_metrics.items():
+        print(f"  {platform}: {metrics['overall_positive']:.2f}% positive (n={metrics['sample_size']})")
+
+    # Print aspect comparisons
+    print("\nPlatform Comparison by Aspect (Positive %):")
+
+    aspects = ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']
+    for aspect in aspects:
+        print(f"\n  {aspect.capitalize()}:")
+        for platform, metrics in platform_metrics.items():
+            if aspect in metrics['aspects']:
+                print(f"    {platform}: {metrics['aspects'][aspect]:.2f}%")
+
+    return platform_metrics
 
 
-# 7. ABLATION STUDY
+# 8. ABLATION STUDY
 def perform_ablation_study(df):
     """Perform ablation study to show contribution of each enhancement"""
-    # Split data for training and testing
-    X = df['processed_content']
-    y_sentiment = df['positive_sentiment'] if 'positive_sentiment' in df.columns else None
-
-    if y_sentiment is None:
-        print("Cannot perform ablation study: sentiment labels not available")
-        return {}
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y_sentiment, test_size=0.3, random_state=42)
-
     print("\nPerforming ablation study...")
+
+    # Define target and features
+    X = df[['processed_content', 'text_length', 'word_count', 'sentiment_ratio',
+            'positive_word_count', 'negative_word_count']]
+
+    # Add platform columns if available (dynamically)
+    platform_cols = [col for col in df.columns if col.startswith('platform_')]
+    platform_mention_cols = [col for col in df.columns if col.startswith('mentions_')]
+
+    for col in platform_cols + platform_mention_cols:
+        if col in df.columns:
+            X[col] = df[col]
+
+    # Add platform column itself for stratification
+    if 'platform' in df.columns:
+        X['platform'] = df['platform']
+
+    y = df['sentiment_binary']
+
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+    # Get column lists for model building
+    available_columns = list(X_train.columns)
+    manual_cols = [col for col in ['text_length', 'word_count', 'sentiment_ratio',
+                                   'positive_word_count', 'negative_word_count']
+                   if col in available_columns]
 
     # Results dictionary
     results = {}
 
-    # Base model - just TF-IDF and classifier
+    # 1. Base model - just TF-IDF without additional features
     base_pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(max_features=5000)),
-        ('classifier', LogisticRegression(max_iter=1000))
+        ('tfidf', TfidfVectorizer(max_features=3000)),
+        ('classifier', LogisticRegression(max_iter=1000, class_weight='balanced'))
     ])
 
-    # Train base model
-    base_pipeline.fit(X_train, y_train)
-    y_pred_base = base_pipeline.predict(X_test)
+    base_pipeline.fit(X_train['processed_content'], y_train)
+    y_pred_base = base_pipeline.predict(X_test['processed_content'])
     base_metrics = precision_recall_fscore_support(y_test, y_pred_base, average='binary')
     base_accuracy = accuracy_score(y_test, y_pred_base)
-    results['Base Model'] = {
+
+    results['Base Model (TF-IDF only)'] = {
         'accuracy': base_accuracy,
         'precision': base_metrics[0],
         'recall': base_metrics[1],
         'f1': base_metrics[2]
     }
 
-    # Add subjectivity as a feature
-    df_train = df.iloc[X_train.index].copy()
-    df_test = df.iloc[X_test.index].copy()
+    # 2. With lexicon-based sentiment features
+    # Create features
+    X_train_lex = X_train[['processed_content', 'positive_word_count', 'negative_word_count']]
+    X_test_lex = X_test[['processed_content', 'positive_word_count', 'negative_word_count']]
 
-    # Simplified approach for demonstration
-    # In a real implementation, we would extract features from subjectivity classifier
-    subjectivity_accuracy = base_accuracy * 1.05  # Simulate 5% improvement
-    results['With Subjectivity'] = {
-        'accuracy': subjectivity_accuracy,
-        'precision': base_metrics[0] * 1.05,
-        'recall': base_metrics[1] * 1.05,
-        'f1': base_metrics[2] * 1.05
+    # Build pipeline
+    lex_pipeline = Pipeline([
+        ('preprocessor', ColumnTransformer([
+            ('text', TfidfVectorizer(max_features=3000), 'processed_content'),
+            ('lexicon', Pipeline([
+                ('identity', FunctionTransformer(lambda x: x)),
+                ('scaler', StandardScaler())
+            ]), ['positive_word_count', 'negative_word_count'])
+        ])),
+        ('classifier', LogisticRegression(max_iter=1000, class_weight='balanced'))
+    ])
+
+    lex_pipeline.fit(X_train_lex, y_train)
+    y_pred_lex = lex_pipeline.predict(X_test_lex)
+    lex_metrics = precision_recall_fscore_support(y_test, y_pred_lex, average='binary')
+    lex_accuracy = accuracy_score(y_test, y_pred_lex)
+
+    results['With Lexicon Features'] = {
+        'accuracy': lex_accuracy,
+        'precision': lex_metrics[0],
+        'recall': lex_metrics[1],
+        'f1': lex_metrics[2]
     }
 
-    # Add aspect features
-    # Similar simplified approach
-    aspect_accuracy = base_accuracy * 1.08  # Simulate 8% improvement
-    results['With Aspect Extraction'] = {
-        'accuracy': aspect_accuracy,
-        'precision': base_metrics[0] * 1.08,
-        'recall': base_metrics[1] * 1.08,
-        'f1': base_metrics[2] * 1.08
+    # 3. With all manual features
+    manual_cols = ['text_length', 'word_count', 'sentiment_ratio',
+                   'positive_word_count', 'negative_word_count']
+    X_train_full = X_train[['processed_content'] + manual_cols]
+    X_test_full = X_test[['processed_content'] + manual_cols]
+
+    full_pipeline = Pipeline([
+        ('preprocessor', ColumnTransformer([
+            ('text', TfidfVectorizer(max_features=3000), 'processed_content'),
+            ('manual', Pipeline([
+                ('identity', FunctionTransformer(lambda x: x)),
+                ('scaler', StandardScaler())
+            ]), manual_cols)
+        ])),
+        ('classifier', LogisticRegression(max_iter=1000, class_weight='balanced'))
+    ])
+
+    full_pipeline.fit(X_train_full, y_train)
+    y_pred_full = full_pipeline.predict(X_test_full)
+    full_metrics = precision_recall_fscore_support(y_test, y_pred_full, average='binary')
+    full_accuracy = accuracy_score(y_test, y_pred_full)
+
+    results['With All Manual Features'] = {
+        'accuracy': full_accuracy,
+        'precision': full_metrics[0],
+        'recall': full_metrics[1],
+        'f1': full_metrics[2]
     }
 
-    # Combined model
-    combined_accuracy = base_accuracy * 1.12  # Simulate 12% improvement
-    results['Combined Model'] = {
-        'accuracy': combined_accuracy,
-        'precision': base_metrics[0] * 1.12,
-        'recall': base_metrics[1] * 1.12,
-        'f1': base_metrics[2] * 1.12
+    # 4. With platform features (if available)
+    if platform_cols:
+        platform_feature_cols = manual_cols + platform_cols + platform_mention_cols
+        X_train_platform = X_train[['processed_content'] + platform_feature_cols]
+        X_test_platform = X_test[['processed_content'] + platform_feature_cols]
+
+        platform_pipeline = Pipeline([
+            ('preprocessor', ColumnTransformer([
+                ('text', TfidfVectorizer(max_features=3000), 'processed_content'),
+                ('manual_platform', Pipeline([
+                    ('identity', FunctionTransformer(lambda x: x)),
+                    ('scaler', StandardScaler())
+                ]), platform_feature_cols)
+            ])),
+            ('classifier', LogisticRegression(max_iter=1000, class_weight='balanced'))
+        ])
+
+        platform_pipeline.fit(X_train_platform, y_train)
+        y_pred_platform = platform_pipeline.predict(X_test_platform)
+        platform_metrics = precision_recall_fscore_support(y_test, y_pred_platform, average='binary')
+        platform_accuracy = accuracy_score(y_test, y_pred_platform)
+
+        results['With Platform Features'] = {
+            'accuracy': platform_accuracy,
+            'precision': platform_metrics[0],
+            'recall': platform_metrics[1],
+            'f1': platform_metrics[2]
+        }
+
+    # 5. RandomForest with all features
+    if platform_cols:
+        all_feature_cols = manual_cols + platform_cols + platform_mention_cols
+    else:
+        all_feature_cols = manual_cols
+
+    X_train_rf = X_train[['processed_content'] + all_feature_cols]
+    X_test_rf = X_test[['processed_content'] + all_feature_cols]
+
+    rf_pipeline = Pipeline([
+        ('preprocessor', ColumnTransformer([
+            ('text', TfidfVectorizer(max_features=3000), 'processed_content'),
+            ('all_features', Pipeline([
+                ('identity', FunctionTransformer(lambda x: x)),
+                ('scaler', StandardScaler())
+            ]), all_feature_cols)
+        ])),
+        ('classifier', RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'))
+    ])
+
+    rf_pipeline.fit(X_train_rf, y_train)
+    y_pred_rf = rf_pipeline.predict(X_test_rf)
+    rf_metrics = precision_recall_fscore_support(y_test, y_pred_rf, average='binary')
+    rf_accuracy = accuracy_score(y_test, y_pred_rf)
+
+    results['RandomForest with All Features'] = {
+        'accuracy': rf_accuracy,
+        'precision': rf_metrics[0],
+        'recall': rf_metrics[1],
+        'f1': rf_metrics[2]
     }
 
     # Print results
@@ -416,96 +964,16 @@ def perform_ablation_study(df):
     return results
 
 
-# 8. ANNOTATION HANDLING
-def prepare_annotation_dataset(df, sample_size=1000):
-    """Prepare a dataset for manual annotation"""
-    print("\nPreparing data for manual annotation...")
-
-    # Randomly sample records
-    if len(df) > sample_size:
-        df_annotation = df.sample(sample_size, random_state=42)
-    else:
-        df_annotation = df.copy()
-
-    # Create columns for annotations
-    df_annotation['subjective_annotator1'] = None
-    df_annotation['subjective_annotator2'] = None
-    df_annotation['sentiment_annotator1'] = None
-    df_annotation['sentiment_annotator2'] = None
-
-    # Save annotation file
-    df_annotation[['id', 'content', 'subjective_annotator1', 'subjective_annotator2',
-                   'sentiment_annotator1', 'sentiment_annotator2']].to_csv('annotation_dataset.csv', index=False)
-
-    print(f"Annotation dataset with {len(df_annotation)} records saved to 'annotation_dataset.csv'")
-    print("Please have two annotators fill in the annotation columns, then run calculate_annotator_agreement()")
-
-    return df_annotation
-
-
-def calculate_annotator_agreement(annotation_file='annotation_dataset.csv'):
-    """Calculate inter-annotator agreement from completed annotations"""
-    # Load annotation file
-    df_annotations = pd.read_csv(annotation_file)
-
-    # Check if annotations are complete
-    if df_annotations['subjective_annotator1'].isnull().any() or df_annotations['subjective_annotator2'].isnull().any():
-        print("Warning: Subjective annotations are incomplete")
-
-    if df_annotations['sentiment_annotator1'].isnull().any() or df_annotations['sentiment_annotator2'].isnull().any():
-        print("Warning: Sentiment annotations are incomplete")
-
-    # Calculate agreement percentages
-    subjective_agreement = (df_annotations['subjective_annotator1'] == df_annotations['subjective_annotator2']).mean()
-    sentiment_agreement = (df_annotations['sentiment_annotator1'] == df_annotations['sentiment_annotator2']).mean()
-
-    print("\nInter-Annotator Agreement:")
-    print(f"Subjectivity Agreement: {subjective_agreement:.4f} ({subjective_agreement * 100:.2f}%)")
-    print(f"Sentiment Agreement: {sentiment_agreement:.4f} ({sentiment_agreement * 100:.2f}%)")
-
-    # Check if agreement meets the 80% threshold
-    threshold_met = (subjective_agreement >= 0.8 and sentiment_agreement >= 0.8)
-
-    if threshold_met:
-        print("✓ Agreement threshold of 80% is met for both tasks")
-    else:
-        print("✗ Agreement threshold of 80% is not met for one or both tasks")
-        print("Consider reviewing the annotation guidelines and resolving disagreements")
-
-    # If we have good agreement, create a gold standard dataset
-    if threshold_met:
-        # For simplicity, use annotator1's labels where they agree with annotator2
-        df_annotations['gold_subjective'] = None
-        df_annotations['gold_sentiment'] = None
-
-        # Where annotators agree, use that label
-        subj_agree_mask = df_annotations['subjective_annotator1'] == df_annotations['subjective_annotator2']
-        df_annotations.loc[subj_agree_mask, 'gold_subjective'] = df_annotations.loc[
-            subj_agree_mask, 'subjective_annotator1']
-
-        sent_agree_mask = df_annotations['sentiment_annotator1'] == df_annotations['sentiment_annotator2']
-        df_annotations.loc[sent_agree_mask, 'gold_sentiment'] = df_annotations.loc[
-            sent_agree_mask, 'sentiment_annotator1']
-
-        # For disagreements, you could have a third annotator or use a tie-breaker
-        # For demonstration, we'll use annotator1's label for simplicity
-        df_annotations.loc[~subj_agree_mask, 'gold_subjective'] = df_annotations.loc[
-            ~subj_agree_mask, 'subjective_annotator1']
-        df_annotations.loc[~sent_agree_mask, 'gold_sentiment'] = df_annotations.loc[
-            ~sent_agree_mask, 'sentiment_annotator1']
-
-        # Save gold standard annotations
-        df_annotations.to_csv('gold_standard_annotations.csv', index=False)
-        print("\nGold standard annotations saved to 'gold_standard_annotations.csv'")
-
-    return df_annotations, threshold_met
-
-
 # 9. VISUALIZATION FUNCTIONS
-def visualize_results(df, ablation_results, absa_results=None):
+def visualize_results(df, ablation_results, absa_results=None, platform_metrics=None):
     """Create visualizations of the analysis results"""
     # Set up the visualization environment
     plt.style.use('ggplot')
+    plt.rcParams.update({'font.size': 12})
+
+    # Create output directory if it doesn't exist
+    if not os.path.exists('visualizations'):
+        os.makedirs('visualizations')
 
     # 1. Ablation Study Results
     if ablation_results:
@@ -513,7 +981,7 @@ def visualize_results(df, ablation_results, absa_results=None):
         accuracies = [ablation_results[model]['accuracy'] for model in models]
         f1_scores = [ablation_results[model]['f1'] for model in models]
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(14, 8))
         x = np.arange(len(models))
         width = 0.35
 
@@ -526,31 +994,63 @@ def visualize_results(df, ablation_results, absa_results=None):
         plt.xticks(x, models, rotation=45, ha='right')
         plt.legend()
         plt.tight_layout()
-        plt.savefig('ablation_results.png')
-        print("Saved ablation study visualization to 'ablation_results.png'")
+        plt.savefig('visualizations/ablation_results.png')
+        print("Saved ablation study visualization to 'visualizations/ablation_results.png'")
 
-    # 2. Aspect Distribution
-    aspects = ['subscription', 'ads', 'content', 'user_experience', 'quality']
-    aspect_counts = [df[f'has_{aspect}'].sum() for aspect in aspects]
+    # 2. Overall Sentiment Distribution
+    sentiment_counts = df['sentiment_binary'].value_counts()
+    plt.figure(figsize=(10, 8))
+    plt.pie(
+        sentiment_counts,
+        labels=['Negative', 'Positive'],
+        autopct='%1.1f%%',
+        colors=['#ff9999', '#66b3ff'],
+        startangle=90,
+        explode=(0.05, 0)
+    )
+    plt.title('Overall Sentiment Distribution in Comments')
+    plt.savefig('visualizations/sentiment_distribution.png')
+    print("Saved sentiment distribution visualization to 'visualizations/sentiment_distribution.png'")
 
-    plt.figure(figsize=(10, 6))
-    plt.bar(aspects, aspect_counts)
-    plt.xlabel('Aspect')
-    plt.ylabel('Count')
-    plt.title('Distribution of Aspects in Netflix Comments')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.savefig('aspect_distribution.png')
-    print("Saved aspect distribution visualization to 'aspect_distribution.png'")
+    # 3. Platform-specific Sentiment Distribution
+    if 'platform' in df.columns:
+        platforms = df['platform'].value_counts()
+        top_platforms = platforms[platforms > 50].index.tolist()  # Only plot platforms with enough data
 
-    # 3. ABSA Results
+        if len(top_platforms) > 1:  # Only create plot if we have multiple platforms
+            platform_sentiment = {}
+
+            for platform in top_platforms:
+                platform_df = df[df['platform'] == platform]
+                positive_pct = platform_df['sentiment_binary'].mean() * 100
+                platform_sentiment[platform] = positive_pct
+
+            # Sort by sentiment
+            platform_sentiment = {k: v for k, v in
+                                  sorted(platform_sentiment.items(), key=lambda item: item[1], reverse=True)}
+
+            plt.figure(figsize=(12, 8))
+            plt.bar(
+                list(platform_sentiment.keys()),
+                list(platform_sentiment.values()),
+                color=plt.cm.viridis(np.linspace(0, 0.8, len(platform_sentiment)))
+            )
+            plt.xlabel('Platform')
+            plt.ylabel('Positive Sentiment (%)')
+            plt.title('Positive Sentiment by Platform')
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            plt.savefig('visualizations/platform_sentiment.png')
+            print("Saved platform sentiment visualization to 'visualizations/platform_sentiment.png'")
+
+    # 4. Aspect Sentiment Distribution
     if absa_results:
         aspects = list(absa_results.keys())
         positive_percentages = []
         negative_percentages = []
 
         for aspect in aspects:
-            total = absa_results[aspect]['positive'] + absa_results[aspect]['negative']
+            total = absa_results[aspect]['total']
             if total > 0:
                 positive_percentages.append(absa_results[aspect]['positive'] / total * 100)
                 negative_percentages.append(absa_results[aspect]['negative'] / total * 100)
@@ -558,80 +1058,186 @@ def visualize_results(df, ablation_results, absa_results=None):
                 positive_percentages.append(0)
                 negative_percentages.append(0)
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(12, 8))
         x = np.arange(len(aspects))
         width = 0.35
 
-        plt.bar(x - width / 2, positive_percentages, width, label='Positive')
-        plt.bar(x + width / 2, negative_percentages, width, label='Negative')
+        plt.bar(x - width / 2, positive_percentages, width, label='Positive', color='#66b3ff')
+        plt.bar(x + width / 2, negative_percentages, width, label='Negative', color='#ff9999')
 
         plt.xlabel('Aspect')
         plt.ylabel('Percentage')
         plt.title('Sentiment Distribution by Aspect')
-        plt.xticks(x, [a.capitalize() for a in aspects], rotation=45, ha='right')
+        plt.xticks(x, [a.capitalize().replace('_', ' ') for a in aspects], rotation=45, ha='right')
         plt.legend()
         plt.tight_layout()
-        plt.savefig('absa_results.png')
-        print("Saved ABSA results visualization to 'absa_results.png'")
+        plt.savefig('visualizations/aspect_sentiment.png')
+        print("Saved aspect sentiment visualization to 'visualizations/aspect_sentiment.png'")
+
+    # 5. Platform Comparison by Aspect
+    if platform_metrics and len(platform_metrics) > 1:
+        # Prepare data for heatmap
+        aspects = ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']
+        platforms = list(platform_metrics.keys())
+
+        # Create matrix for heatmap
+        heatmap_data = np.zeros((len(platforms), len(aspects)))
+
+        for i, platform in enumerate(platforms):
+            for j, aspect in enumerate(aspects):
+                if aspect in platform_metrics[platform]['aspects']:
+                    heatmap_data[i, j] = platform_metrics[platform]['aspects'][aspect]
+                else:
+                    heatmap_data[i, j] = np.nan  # Missing data
+
+        # Create heatmap
+        plt.figure(figsize=(14, 10))
+        sns.heatmap(
+            heatmap_data,
+            annot=True,
+            fmt='.1f',
+            cmap='YlGnBu',
+            xticklabels=[a.capitalize().replace('_', ' ') for a in aspects],
+            yticklabels=platforms,
+            linewidths=.5,
+            cbar_kws={'label': 'Positive Sentiment (%)'}
+        )
+        plt.title('Platform Comparison by Aspect (% Positive)')
+        plt.tight_layout()
+        plt.savefig('visualizations/platform_aspect_comparison.png')
+        print("Saved platform aspect comparison visualization to 'visualizations/platform_aspect_comparison.png'")
 
 
 # 10. MAIN FUNCTION
 def main():
-    # Set the path to your dataset
-    file_path = 'data/streaming_opinions_dataset.csv'
+    # Set the path to your pre-annotated dataset
+    file_path = '../data/evaluation_dataset_merged.csv'
 
-    # Load and preprocess data
+    # Configure warnings to be less verbose
+    import warnings
+    warnings.filterwarnings('ignore', category=UserWarning)
+    warnings.filterwarnings('ignore', category=FutureWarning)
+
+    # 1. Load and preprocess data
     print("Loading and preprocessing data...")
     df = load_data(file_path)
     df = prepare_data(df)
 
+    # 2. Extract features
+    print("\nExtracting features from data...")
+    df = extract_features(df)
+
     # Display dataset info
     print(f"\nDataset Information:")
     print(f"Total records: {len(df)}")
-    print(f"Submissions: {len(df[df['type'] == 'submission'])}")
-    print(f"Comments: {len(df[df['type'] == 'comment'])}")
+    print(
+        f"Positive sentiment: {len(df[df['sentiment_binary'] == 1])} ({len(df[df['sentiment_binary'] == 1]) / len(df) * 100:.2f}%)")
+    print(
+        f"Negative sentiment: {len(df[df['sentiment_binary'] == 0])} ({len(df[df['sentiment_binary'] == 0]) / len(df) * 100:.2f}%)")
 
-    # Prepare dataset for annotation
-    annotation_df = prepare_annotation_dataset(df)
+    # Print platform distribution if available
+    if 'platform' in df.columns:
+        platform_counts = df['platform'].value_counts()
+        print("\nPlatform distribution in preprocessed data:")
+        for platform, count in platform_counts.items():
+            print(f"  {platform}: {count} ({count / len(df) * 100:.2f}%)")
 
-    # Check if annotation file exists and is filled
-    annotation_file = 'annotation_dataset.csv'
-    if os.path.exists(annotation_file):
-        try:
-            annotations, agreement_met = calculate_annotator_agreement(annotation_file)
-            if agreement_met:
-                print("Using gold standard annotations for training and evaluation")
-                # Here you would use these annotations for more accurate models
-        except Exception as e:
-            print(f"Could not process annotations: {e}")
-            print("Proceeding with automated analysis")
+    # 3. Split data for training and testing
+    feature_cols = ['processed_content', 'text_length', 'word_count', 'sentiment_ratio',
+                    'positive_word_count', 'negative_word_count']
 
-    # Train subjectivity classifier
-    subjectivity_model = train_subjectivity_classifier(df)
+    # Add platform-related columns if available
+    platform_cols = [col for col in df.columns if col.startswith('platform_')]
+    platform_mention_cols = [col for col in df.columns if col.startswith('mentions_')]
 
-    # Train sentiment classifier
-    sentiment_model = train_sentiment_classifier(df)
+    all_feature_cols = feature_cols + platform_cols + platform_mention_cols
+    X = df[all_feature_cols]
 
-    # Perform aspect extraction
-    df = extract_aspects(df)
+    # Add platform column itself for stratification
+    if 'platform' in df.columns:
+        X['platform'] = df['platform']
 
-    # Use transformer model for better sentiment analysis
-    transformer_model = transformer_sentiment_analysis(df)
+    y_sentiment = df['sentiment_binary']
 
-    # Perform Aspect-Based Sentiment Analysis
-    absa_results = perform_absa(df, transformer_model)
+    # Stratified split to maintain platform distribution
+    if 'platform' in X.columns:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y_sentiment, test_size=0.3, random_state=42, stratify=df['platform']
+        )
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y_sentiment, test_size=0.3, random_state=42
+        )
 
-    # Perform ablation study
+    # 4. Train and evaluate sentiment models with different algorithms
+    # Logistic Regression without platform features
+    sentiment_lr_no_platform, metrics_lr_no_platform = train_and_evaluate_model(
+        X_train, X_test, y_train, y_test, 'lr', 'sentiment', include_platform=False
+    )
+
+    # Logistic Regression with platform features
+    sentiment_lr, metrics_lr = train_and_evaluate_model(
+        X_train, X_test, y_train, y_test, 'lr', 'sentiment', include_platform=True
+    )
+
+    # Random Forest with platform features
+    sentiment_rf, metrics_rf = train_and_evaluate_model(
+        X_train, X_test, y_train, y_test, 'rf', 'sentiment', include_platform=True
+    )
+
+    # Random Forest with platform-stratified evaluation
+    if 'platform' in df.columns:
+        sentiment_rf_strat, metrics_rf_strat = train_and_evaluate_model(
+            X_train, X_test, y_train, y_test, 'rf', 'sentiment',
+            include_platform=True, platform_stratified=True
+        )
+
+    # 5. Train and evaluate aspect models
+    aspect_models = {}
+    aspect_metrics = {}
+
+    for aspect in ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']:
+        aspect_col = f"manual_{aspect}_binary"
+
+        if aspect_col in df.columns:
+            # Skip aspects with too few positive examples
+            positive_count = df[aspect_col].sum()
+            if positive_count > 30:  # Minimum threshold for training
+                y_aspect = df[aspect_col]
+                X_train_aspect, X_test_aspect, y_train_aspect, y_test_aspect = train_test_split(
+                    X, y_aspect, test_size=0.3, random_state=42
+                )
+
+                model, metrics = build_aspect_model(
+                    aspect, X_train_aspect, X_test_aspect, y_train_aspect, y_test_aspect
+                )
+
+                aspect_models[aspect] = model
+                aspect_metrics[aspect] = metrics
+
+    # 6. Use transformer model for sentiment analysis
+    transformer_model, transformer_metrics = transformer_sentiment_analysis(df, stratify_by_platform=True)
+
+    # 7. Perform Aspect-Based Sentiment Analysis
+    absa_results, absa_by_platform = perform_absa(df, transformer_model, by_platform=True)
+
+    # 8. Compare platforms
+    if 'platform' in df.columns:
+        platform_metrics = compare_platforms(df, absa_by_platform)
+    else:
+        platform_metrics = None
+
+    # 9. Perform ablation study
     ablation_results = perform_ablation_study(df)
 
-    # Visualize results
-    visualize_results(df, ablation_results, absa_results)
+    # 10. Visualize results
+    visualize_results(df, ablation_results, absa_results, platform_metrics)
 
     print("\nAnalysis complete!")
 
     # Save processed data
-    df.to_csv('netflix_processed.csv', index=False)
-    print("Processed data saved to 'netflix_processed.csv'")
+    df.to_csv('result/streaming_platforms_processed.csv', index=False)
+    print("Processed data saved to 'streaming_platforms_processed.csv'")
 
 
 if __name__ == "__main__":
