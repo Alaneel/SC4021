@@ -95,6 +95,8 @@ class EnhancedDataProcessor:
             ]
         }
 
+        self.bot_list = ['RemindMeBot', 'AutoModerator']
+
     def load_data(self, filepath):
         """
         Load data from CSV file.
@@ -127,6 +129,9 @@ class EnhancedDataProcessor:
 
         # Remove URLs
         text = re.sub(r'http\S+', '', text)
+
+        # Replacing multi spaces/new lines to one space
+        text = re.sub(r'\s+', ' ', text).strip()
 
         # Remove special characters and numbers
         text = re.sub(r'[^\w\s]', '', text)
@@ -329,6 +334,13 @@ class EnhancedDataProcessor:
         # Create a unique ID column if not exists
         if 'id' not in df.columns:
             df['id'] = [f"record_{i}" for i in range(len(df))]
+
+        # Remove bot comments
+        if 'author' in df.columns:
+            print("Removing bot comments...")
+            bot_comments = df[df['author'].isin(self.bot_list)].shape[0]
+            df = df[~df['author'].isin(self.bot_list)]
+            print(f'Removed {bot_comments} bot comments')
 
         # Clean text columns
         if 'text' in df.columns:
