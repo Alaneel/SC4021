@@ -98,6 +98,9 @@ def search():
     rows = int(request.args.get('rows', 10))
     start = int(request.args.get('start', 0))
 
+    # Get sort parameter, default to 'score desc'
+    sort = request.args.get('sort', 'score desc')
+
     # Build filter queries with any necessary escaping
     fq = []
     if platform:
@@ -112,8 +115,17 @@ def search():
     if feature and feature != 'any':
         fq.append(f'{feature}:[0.5 TO *]')
 
+    '''
     if start_date and end_date:
         fq.append(f'created_at:[{start_date}T00:00:00Z TO {end_date}T23:59:59Z]')
+    '''
+
+    # Modified date filtering to handle start_date and/or end_date
+    if start_date or end_date:
+        # Default to unbounded ranges if one date is missing
+        start_range = start_date + 'T00:00:00Z' if start_date else '*'
+        end_range = end_date + 'T23:59:59Z' if end_date else '*'
+        fq.append(f'created_at:[{start_range} TO {end_range}]')
 
     # Process the query - don't expand it unless it's the special wildcard query
     solr_query = raw_query
@@ -134,7 +146,7 @@ def search():
         'facet.range.start': 'NOW-1YEAR',
         'facet.range.end': 'NOW',
         'facet.range.gap': '+1MONTH',
-        'sort': 'score desc',
+        'sort': sort,
         'fl': 'id,text,cleaned_text,full_text,cleaned_full_text,title,platform,source,created_at,score,type,author,subreddit,permalink,parent_id,num_comments,word_count,sentiment,sentiment_score,subjectivity_score,content_quality,pricing,ui_ux,technical,customer_service',
         'wt': 'json',
     }
@@ -202,7 +214,8 @@ def search():
             selected_feature=feature,
             start_date=start_date,
             end_date=end_date,
-            visualizations=visualizations
+            visualizations=visualizations,
+            sort=sort
         )
     except Exception as e:
         error_message = f"Error searching Solr: {str(e)}"
@@ -355,8 +368,56 @@ def generate_visualizations(facets, query):
                          title=f'Platform Distribution for query: {query}')
             visualizations['platform_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
-    # Similar implementations for type_pie, sentiment_bar, and time_series
-    # (Implementation abbreviated for clarity)
+    
+    if 'type' in facet_fields:
+        type_data = []
+        type_facets = facet_fields['type']
+
+        for i in range(0, len(type_facets), 2):
+            if i + 1 < len(type_facets) and type_facets[i + 1] > 0:
+                type_data.append({
+                    'type': type_facets[i],
+                    'count': type_facets[i + 1]
+                })
+
+        if type_data:
+            df = pd.DataFrame(type_data)
+            fig = px.pie(df, values='count', names='type',
+                         title=f'Type Distribution for query: {query}')
+            visualizations['type_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+
+    if 'sentiment' in facet_fields:
+        sentiment_data = []
+        sentiment_facets = facet_fields['sentiment']
+
+        for i in range(0, len(sentiment_facets), 2):
+            if i + 1 < len(sentiment_facets) and sentiment_facets[i + 1] > 0:
+                sentiment_data.append({
+                    'sentiment':sentiment_facets[i],
+                    'count':sentiment_facets[i + 1]
+                })
+
+        if sentiment_data:
+            df = pd.DataFrame(sentiment_data)
+            fig = px.bar(df, x = 'sentiment', y='count',
+                         title=f'Sentiment Distribution for query: {query}')
+            visualizations['sentiment_bar'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        if 'created_at' in facets.get('facet_ranges', {}):
+            time_data = []
+            time_facets = facets['facet_ranges']['created_at']['counts']
+            for i in range(0, len(time_facets), 2):
+                if i + 1 < len(time_facets) and time_facets[i + 1] > 0:
+                    time_data.append({
+                        'date': time_facets[i],
+                        'count': time_facets[i + 1]
+                    })
+            if time_data:
+                df = pd.DataFrame(time_data)
+                fig = px.line(df, x='date', y='count',
+                            title=f'Timeline for query: {query}')
+                visualizations['time_series'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
     return visualizations
 
