@@ -5,7 +5,6 @@
 
 {% block head %}
 {{ super() }}
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -147,59 +146,46 @@
         </div>
 
         <!-- Visualizations -->
+        <!-- Visualizations -->
         {% if visualizations %}
         <div class="card mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">Data Visualizations</h5>
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Data Visualization</h5>
+                <select id="visualization-select" class="form-select w-auto">
+                    <option value="" selected>Select a Visualization</option>
+                    {% if visualizations.platform_pie %}
+                    <option value="platform">Platform Distribution</option>
+                    {% endif %}
+                    {% if visualizations.type_pie %}
+                    <option value="type">Content Type Distribution</option>
+                    {% endif %}
+                    {% if visualizations.sentiment_bar %}
+                    <option value="sentiment">Sentiment Distribution</option>
+                    {% endif %}
+                    {% if visualizations.time_series %}
+                    <option value="time">Timeline</option>
+                    {% endif %}
+                </select>
             </div>
             <div class="card-body">
-                <ul class="nav nav-tabs" id="visualizationTabs" role="tablist">
+                <div id="visualization-container">
                     {% if visualizations.platform_pie %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="platform-tab" data-bs-toggle="tab" data-bs-target="#platform" type="button" role="tab" aria-controls="platform" aria-selected="true">Platforms</button>
-                    </li>
-                    {% endif %}
-
-                    {% if visualizations.type_pie %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if not visualizations.platform_pie %}active{% endif %}" id="type-tab" data-bs-toggle="tab" data-bs-target="#type" type="button" role="tab" aria-controls="type" aria-selected="{% if not visualizations.platform_pie %}true{% else %}false{% endif %}">Content Types</button>
-                    </li>
-                    {% endif %}
-
-                    {% if visualizations.sentiment_bar %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if not visualizations.platform_pie and not visualizations.type_pie %}active{% endif %}" id="sentiment-tab" data-bs-toggle="tab" data-bs-target="#sentiment" type="button" role="tab" aria-controls="sentiment" aria-selected="{% if not visualizations.platform_pie and not visualizations.type_pie %}true{% else %}false{% endif %}">Sentiment</button>
-                    </li>
-                    {% endif %}
-
-                    {% if visualizations.time_series %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}active{% endif %}" id="time-tab" data-bs-toggle="tab" data-bs-target="#time" type="button" role="tab" aria-controls="time" aria-selected="{% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}true{% else %}false{% endif %}">Timeline</button>
-                    </li>
-                    {% endif %}
-                </ul>
-
-                <div class="tab-content pt-3" id="visualizationTabContent">
-                    {% if visualizations.platform_pie %}
-                    <div class="tab-pane fade show active" id="platform" role="tabpanel" aria-labelledby="platform-tab">
+                    <div id="platform-chart-container" class="visualization-chart" style="display: none;">
                         <div id="platform-chart" style="width:100%; height:400px;"></div>
                     </div>
                     {% endif %}
-
                     {% if visualizations.type_pie %}
-                    <div class="tab-pane fade {% if not visualizations.platform_pie %}show active{% endif %}" id="type" role="tabpanel" aria-labelledby="type-tab">
+                    <div id="type-chart-container" class="visualization-chart" style="display: none;">
                         <div id="type-chart" style="width:100%; height:400px;"></div>
                     </div>
                     {% endif %}
-
                     {% if visualizations.sentiment_bar %}
-                    <div class="tab-pane fade {% if not visualizations.platform_pie and not visualizations.type_pie %}show active{% endif %}" id="sentiment" role="tabpanel" aria-labelledby="sentiment-tab">
+                    <div id="sentiment-chart-container" class="visualization-chart" style="display: none;">
                         <div id="sentiment-chart" style="width:100%; height:400px;"></div>
                     </div>
                     {% endif %}
-
                     {% if visualizations.time_series %}
-                    <div class="tab-pane fade {% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}show active{% endif %}" id="time" role="tabpanel" aria-labelledby="time-tab">
+                    <div id="time-chart-container" class="visualization-chart" style="display: none;">
                         <div id="time-chart" style="width:100%; height:400px;"></div>
                     </div>
                     {% endif %}
@@ -208,9 +194,10 @@
         </div>
         {% endif %}
 
+
         <!-- Search results -->
         <div class="card mb-4">
-            <div class="card-header bg-light">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                 {% if num_found > 0 %}
                     Documents ({{ start + 1 }}-{{ start + results|length }} of {{ num_found }})
@@ -218,6 +205,25 @@
                     No Documents Found
                 {% endif %}
                 </h5>
+                <div class="d-flex align-items-center">
+                    <span class="me-2">Sort by:</span>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            {% if sort == 'created_at asc' %}
+                                Date Ascending
+                            {% elif sort == 'created_at desc' %}
+                                Date Descending
+                            {% else %}
+                                Relavance
+                            {% endif %}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sortDropdown">
+                            <li><a class="dropdown-item" href="/search?q={{ query|urlencode }}&start=0&rows={{ rows }}&sort=created_at asc{% if selected_platform %}&platform={{ selected_platform|urlencode }}{% endif %}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment|urlencode }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature|urlencode }}{% endif %}{% if start_date %}&start_date={{ start_date|urlencode }}{% endif %}{% if end_date %}&end_date={{ end_date|urlencode }}{% endif %}">Date Ascending</a></li>
+                            <li><a class="dropdown-item" href="/search?q={{ query|urlencode }}&start=0&rows={{ rows }}&sort=created_at desc{% if selected_platform %}&platform={{ selected_platform|urlencode }}{% endif %}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment|urlencode }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature|urlencode }}{% endif %}{% if start_date %}&start_date={{ start_date|urlencode }}{% endif %}{% if end_date %}&end_date={{ end_date|urlencode }}{% endif %}">Date Descending</a></li>
+                            <li><a class="dropdown-item" href="/search?q={{ query|urlencode }}&start=0&rows={{ rows }}&sort=score desc{% if selected_platform %}&platform={{ selected_platform|urlencode }}{% endif %}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment|urlencode }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature|urlencode }}{% endif %}{% if start_date %}&start_date={{ start_date|urlencode }}{% endif %}{% if end_date %}&end_date={{ end_date|urlencode }}{% endif %}">Relavance</a></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
@@ -335,9 +341,9 @@
     </div>
 </div>
 
-{% if visualizations %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize all charts (hidden by default)
         {% if visualizations.platform_pie %}
         const platformChart = JSON.parse('{{ visualizations.platform_pie|safe }}');
         Plotly.newPlot('platform-chart', platformChart.data, platformChart.layout);
@@ -357,7 +363,29 @@
         const timeChart = JSON.parse('{{ visualizations.time_series|safe }}');
         Plotly.newPlot('time-chart', timeChart.data, timeChart.layout);
         {% endif %}
+
+        // Handle dropdown change
+        const select = document.getElementById('visualization-select');
+        const containers = document.querySelectorAll('.visualization-chart');
+
+        select.addEventListener('change', function() {
+            const selectedValue = this.value;
+
+            // Hide all charts
+            containers.forEach(container => {
+                container.style.display = 'none';
+            });
+
+            // Show the selected chart and resize it
+            if (selectedValue) {
+                const selectedContainer = document.getElementById(`${selectedValue}-chart-container`);
+                if (selectedContainer) {
+                    selectedContainer.style.display = 'block';
+                    const chartDiv = document.getElementById(`${selectedValue}-chart`);
+                    Plotly.Plots.resize(chartDiv); // Resize to ensure proper rendering
+                }
+            }
+        });
     });
 </script>
-{% endif %}
 {% endblock %}
