@@ -17,24 +17,20 @@
     <div class="card-body">
         <div class="mb-4">
             {% if doc.platform %}
-            <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '')|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}">
-                {{ doc.platform|join(', ') }}
+            <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '') }}">
+                {{ doc.platform }}
             </span>
             {% endif %}
 
-            <!-- {% if doc.type %}
+            {% if doc.type %}
             <span class="badge bg-dark">
                 {{ doc.type }}
             </span>
-            {% endif %} -->
+            {% endif %}
 
             {% if doc.sentiment %}
-            <span class="badge 
-            {% if 'positive' in doc.sentiment %}bg-success
-            {% elif 'negative' in doc.sentiment %}bg-danger
-            {% else %}bg-secondary
-            {% endif %}">
-                {{ doc.sentiment|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}
+            <span class="badge {% if doc.sentiment == 'positive' %}bg-success{% elif doc.sentiment == 'negative' %}bg-danger{% else %}bg-secondary{% endif %}">
+                {{ doc.sentiment }}
             </span>
             {% endif %}
 
@@ -44,18 +40,18 @@
             </span>
             {% endif %}
 
-            <!-- {% if doc.word_count %}
+            {% if doc.word_count %}
             <span class="badge bg-secondary">
-                Words: {{ doc.word_count[0] }}
+                Words: {{ doc.word_count }}
             </span>
-            {% endif %} -->
+            {% endif %}
         </div>
 
         <!-- Original Text -->
         <div class="mb-4">
             <h5>Original Content:</h5>
             <div class="p-3 bg-light rounded">
-                {{ doc.text.0|replace('\n', '<br>')|safe if doc.text else "No content available" }}
+                {{ doc.text|replace('\n', '<br>')|safe if doc.text else "No content available" }}
             </div>
         </div>
 
@@ -64,7 +60,7 @@
         <div class="mb-4">
             <h5>Full Content:</h5>
             <div class="p-3 bg-light rounded">
-                {{ doc.full_text.0|replace('\n', '<br>')|safe }}
+                {{ doc.full_text|replace('\n', '<br>')|safe }}
             </div>
         </div>
         {% endif %}
@@ -74,7 +70,7 @@
         <div class="mb-4">
             <h5>Cleaned Content:</h5>
             <div class="p-3 bg-light rounded">
-                {{ doc.cleaned_text.0|replace('\n', '<br>')|safe }}
+                {{ doc.cleaned_text|replace('\n', '<br>')|safe }}
             </div>
         </div>
         {% endif %}
@@ -86,20 +82,20 @@
                     <tbody>
                         <tr>
                             <th>Author</th>
-                            <td>{{ doc.author.0 }}</td>
+                            <td>{{ doc.author }}</td>
                         </tr>
 
                         {% if doc.subreddit %}
                         <tr>
                             <th>Subreddit</th>
-                            <td>{{ doc.subreddit.0 }}</td>
+                            <td>{{ doc.subreddit }}</td>
                         </tr>
                         {% endif %}
 
                         {% if doc.source and doc.source != doc.subreddit %}
                         <tr>
                             <th>Source</th>
-                            <td>{{ doc.source.0 }}</td>
+                            <td>{{ doc.source }}</td>
                         </tr>
                         {% endif %}
 
@@ -113,43 +109,42 @@
                         {% if doc.created_at %}
                         <tr>
                             <th>Date</th>
-                            <td>{{ doc.created_at.0|replace('T', ' ')|replace('Z', '') }}</td>
+                            <td>{{ doc.created_at|replace('T', ' ')|replace('Z', '') }}</td>
                         </tr>
                         {% endif %}
 
                         {% if doc.score %}
                         <tr>
                             <th>Score</th>
-                            <td>{{ doc.score.0 }}</td>
+                            <td>{{ doc.score }}</td>
                         </tr>
                         {% endif %}
 
                         {% if doc.num_comments %}
                         <tr>
                             <th>Comments</th>
-                            <td>{{ doc.num_comments.0 }}</td>
+                            <td>{{ doc.num_comments }}</td>
                         </tr>
                         {% endif %}
 
                         {% if doc.is_duplicate is defined %}
                         <tr>
                             <th>Is Duplicate</th>
-                            <td>{{ doc.is_duplicate.0 }}</td>
+                            <td>{{ doc.is_duplicate }}</td>
                         </tr>
                         {% endif %}
 
                         {% if doc.subjectivity_score is defined and doc.subjectivity_score is not none and doc.subjectivity_score is number %}
                         <tr>
                             <th>Subjectivity</th>
-                            <td>{{ "%.2f"|format(doc.subjectivity_score.0) }}</td>
+                            <td>{{ "%.2f"|format(doc.subjectivity_score) }}</td>
                         </tr>
                         {% endif %}
 
                         {% if doc.parent_id %}
                         <tr>
                             <th>Parent ID</th>
-                            <!-- assuming starts with t3_ t1_ etc -->
-                            <td><a href="/document/{{ doc.parent_id.0[3:] }}">{{ doc.parent_id.0[3:]}}</a></td>
+                            <td>{{ doc.parent_id }}</td>
                         </tr>
                         {% endif %}
                     </tbody>
