@@ -233,33 +233,46 @@
                             <h5 class="mb-1">
                                 <a href="/document/{{ doc.id }}">
                                     {% if doc.title %}
-                                        {{ doc.title }}
-                                    {% elif doc.text and doc.text|length > 100 %}
-                                        {{ doc.text[:100] }}...
-                                    {% else %}
-                                        Document ID: {{ doc.id }}
+                                        {{ doc.title
+                                            | replace('+', '')
+                                            | replace("['", '')
+                                            | replace("']", '')
+                                            | replace('["', '')
+                                            | replace('"]', '') }}
+                                    {% elif doc.text is sequence and doc.text is not string %} 
+                                        {% if doc.text.0|length > 100 %}
+                                            {{doc.text.0[:100]}} ...
+                                            {% else %}
+                                            {{doc.text.0}}
+                                            {% endif %}
                                     {% endif %}
                                 </a>
                             </h5>
                             <div>
-                                {% if doc.platform %}
-                                <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '') }}">
-                                    {{ doc.platform }}
+                                {% if doc.platform %} 
+                                <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '')|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}">
+                                    {{ doc.platform|join(', ') }}
                                 </span>
                                 {% endif %}
 
-                                {% if doc.type %}
-                                <span class="badge bg-dark">
-                                    {{ doc.type }}
+                                <!-- {% if doc.type %}
+                                 <span class="badge bg-dark">
+                                    {{ doc.type|join(', ') }}  
                                 </span>
-                                {% endif %}
+                                {% endif %} -->
                             </div>
                         </div>
 
-                        <p class="mb-1">
-                            {% if doc.text %}
-                                {% if doc.text|length > 300 %}
-                                    {{ doc.text[:300] }}...
+                        <p class="fw-light mb-1 fst-italic">
+                            {% if doc.text is sequence and doc.text is not string %}
+                                {% if doc.text[0]|length > 100 %}
+                                    {{ doc.text[0][:100] }} ...
+                                {% else %}
+                                    {{ doc.text[0] }}
+                                {% endif %}
+                            {% elif doc.text %}
+                                {% if doc.text|length > 100 %}
+                                    {{ doc.text[:100] }} ...
                                 {% else %}
                                     {{ doc.text }}
                                 {% endif %}
@@ -269,28 +282,33 @@
                         <div class="d-flex justify-content-between align-items-center mt-2">
                             <div>
                                 {% if doc.sentiment %}
-                                <span class="badge {% if doc.sentiment == 'positive' %}bg-success{% elif doc.sentiment == 'negative' %}bg-danger{% else %}bg-secondary{% endif %}">
-                                    {{ doc.sentiment }}
+                                <span class="badge 
+                                {% if 'positive' in doc.sentiment %}bg-success
+                                {% elif 'negative' in doc.sentiment %}bg-danger
+                                {% else %}bg-secondary
+                                {% endif %}">
+
+                                {{ doc.sentiment|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}
                                 </span>
                                 {% endif %}
 
                                 {% if doc.created_at %}
-                                <small class="text-muted ms-2">{{ doc.created_at|replace('T', ' ')|replace('Z', '') }}</small>
+                                <small class="text-muted ms-2">{{ doc.created_at_formatted }}</small>
                                 {% endif %}
 
-                                {% if doc.score %}
+                                <!-- {% if doc.score %}
                                 <small class="text-muted ms-2">Score: {{ doc.score }}</small>
-                                {% endif %}
+                                {% endif %} -->
 
                                 {% if doc.author %}
-                                <small class="text-muted ms-2">by: {{ doc.author }}</small>
+                                <small class="text-muted ms-2">by: {{ doc.author|join(', ') }}</small>
                                 {% endif %}
                             </div>
 
                             <div>
                                 {% if doc.content_quality or doc.pricing or doc.ui_ux or doc.technical or doc.customer_service %}
                                 <span class="badge bg-info" title="Has feature analysis">
-                                    <i class="bi bi-graph-up"></i> Analysis
+                                    <i class="bi bi-graph-up"></i> Analysis Available
                                 </span>
                                 {% endif %}
 

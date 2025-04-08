@@ -159,6 +159,19 @@ def search():
         response.raise_for_status()
         results = response.json()
 
+        # Format created_at nicely for each doc
+        for doc in results['response']['docs']:
+            created_at = doc.get('created_at')
+            if created_at and isinstance(created_at, list) and created_at[0]:
+                try:
+                    dt = datetime.strptime(created_at[0], '%Y-%m-%dT%H:%M:%SZ')
+                    # doc['created_at_formatted'] = dt.strftime('%B %-d, %Y')  # Linux/macOS
+                    doc['created_at_formatted'] = dt.strftime('%B %#d, %Y')  # Windows
+                except ValueError:
+                    doc['created_at_formatted'] = created_at[0]  # fallback raw date
+            else:
+                doc['created_at_formatted'] = ''
+
         # Get actual number of results
         num_found = results['response'].get('numFound', 0)
 
@@ -355,6 +368,7 @@ def generate_visualizations(facets, query):
         platform_data = []
         platform_facets = facet_fields['platform']
 
+
         for i in range(0, len(platform_facets), 2):
             if i + 1 < len(platform_facets) and platform_facets[i + 1] > 0:
                 platform_data.append({
@@ -362,11 +376,15 @@ def generate_visualizations(facets, query):
                     'count': platform_facets[i + 1]
                 })
 
+        unique_platforms = {entry['platform'] for entry in platform_data}
+        unique_platforms = len(unique_platforms)
+
         if platform_data:
-            df = pd.DataFrame(platform_data)
-            fig = px.pie(df, values='count', names='platform',
-                         title=f'Platform Distribution for query: {query}')
-            visualizations['platform_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+            if unique_platforms > 1:
+                df = pd.DataFrame(platform_data)
+                fig = px.pie(df, values='count', names='platform',
+                            title=f'Platform Distribution for query: {query}')
+                visualizations['platform_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
     
     if 'type' in facet_fields:
@@ -380,11 +398,15 @@ def generate_visualizations(facets, query):
                     'count': type_facets[i + 1]
                 })
 
+        unique_type = {entry['type'] for entry in type_data}
+        unique_type = len(unique_type)
+
         if type_data:
-            df = pd.DataFrame(type_data)
-            fig = px.pie(df, values='count', names='type',
-                         title=f'Type Distribution for query: {query}')
-            visualizations['type_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+            if unique_type > 1:
+                df = pd.DataFrame(type_data)
+                fig = px.pie(df, values='count', names='type',
+                            title=f'Type Distribution for query: {query}')
+                visualizations['type_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 
     if 'sentiment' in facet_fields:
@@ -398,11 +420,15 @@ def generate_visualizations(facets, query):
                     'count':sentiment_facets[i + 1]
                 })
 
+        unique_sentiments = {entry['sentiment'] for entry in sentiment_data}
+        unique_sentiments = len(unique_sentiments)
+
         if sentiment_data:
-            df = pd.DataFrame(sentiment_data)
-            fig = px.bar(df, x = 'sentiment', y='count',
-                         title=f'Sentiment Distribution for query: {query}')
-            visualizations['sentiment_bar'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+            if unique_sentiments > 1:
+                df = pd.DataFrame(sentiment_data)
+                fig = px.bar(df, x = 'sentiment', y='count',
+                            title=f'Sentiment Distribution for query: {query}')
+                visualizations['sentiment_bar'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
         if 'created_at' in facets.get('facet_ranges', {}):
             time_data = []
