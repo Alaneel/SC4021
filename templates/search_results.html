@@ -12,7 +12,10 @@
     <!-- Search filters sidebar -->
     <div class="col-md-3">
         <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
+            <a href="/" class="btn btn-outline-secondary">&#128269; New Search</a>
+        </div>
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
                 <h5 class="mb-0">Filter Results</h5>
             </div>
             <div class="card-body">
@@ -79,7 +82,7 @@
                     </div>
 
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <button type="submit" class="btn btn-primary bg-light text-dark" style="border: 2px solid #808080; font-weight: bold;">Apply Filters</button>
                     </div>
                 </form>
             </div>
@@ -104,69 +107,67 @@
     <!-- Main content -->
     <div class="col-md-9">
         <!-- Search results header -->
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">Search Results</h4>
-                <div>
-                    <span class="badge bg-light text-dark">{{ num_found }} results found</span>
-                </div>
+        <div class="card mb-4" style="border: none;">
+            <div class="card-header bg-white text-black d-flex justify-content-between align-items-center" style="border-bottom: none; text-decoration: none;" >
+                <h4 class="mb-0" style="font-size: 1.0em; text-decoration: none; border-bottom: none; margin-bottom: 0;">Search Results for:</h4>
             </div>
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h5>Query: <small class="text-muted">{{ query if query != '*:*' else 'All Documents' }}</small></h5>
+                        <h5><small class="text-dark" style="font-size: 1.5em; margin-top: 0;">"{{ query if query != '*:*' else 'All Documents' }}"</small></h5>
                         <div>
-                            {% if selected_platform %}
-                            <span class="badge bg-info me-1">Platform: {{ selected_platform }}</span>
-                            {% endif %}
+                            {% if selected_platform or selected_type or selected_sentiment or selected_feature and selected_feature != 'any' %}
+                            <small class="text-dark">{{ 'Filers:' }}</small>
+                                {% if selected_platform %}
+                                <span class="badge bg-info me-1">Platform: {{ selected_platform }}</span>
+                                {% endif %}
 
-                            {% if selected_type %}
-                            <span class="badge bg-dark me-1">Type: {{ selected_type }}</span>
-                            {% endif %}
+                                {% if selected_type %}
+                                <span class="badge bg-dark me-1">Type: {{ selected_type }}</span>
+                                {% endif %}
 
-                            {% if selected_sentiment %}
-                            <span class="badge
-                                  {% if selected_sentiment == 'positive' %}bg-success
-                                  {% elif selected_sentiment == 'negative' %}bg-danger
-                                  {% else %}bg-secondary{% endif %} me-1">
-                                Sentiment: {{ selected_sentiment }}
-                            </span>
-                            {% endif %}
+                                {% if selected_sentiment %}
+                                <span class="badge
+                                    {% if selected_sentiment == 'positive' %}bg-success
+                                    {% elif selected_sentiment == 'negative' %}bg-danger
+                                    {% else %}bg-secondary{% endif %} me-1">
+                                    Sentiment: {{ selected_sentiment }}
+                                </span>
+                                {% endif %}
 
-                            {% if selected_feature and selected_feature != 'any' %}
-                            <span class="badge bg-primary me-1">Feature: {{ selected_feature }}</span>
+                                {% if selected_feature and selected_feature != 'any' %}
+                                <span class="badge bg-primary me-1">Feature: {{ selected_feature }}</span>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
-                    <div>
-                        <a href="/" class="btn btn-outline-secondary">New Search</a>
+                    <div class="card mb-4" style="border: none;">
+                        <span class="badge bg-white text-dark" style="font-size: 1.4em; font-weight: normal;">{{ num_found }} results found</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Visualizations -->
+
+
         <!-- Visualizations -->
         {% if visualizations %}
-        <div class="card mb-4">
-            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Data Visualization</h5>
-                <select id="visualization-select" class="form-select w-auto">
-                    <option value="" selected>Select a Visualization</option>
-                    {% if visualizations.platform_pie %}
-                    <option value="platform">Platform Distribution</option>
-                    {% endif %}
-                    {% if visualizations.type_pie %}
-                    <option value="type">Content Type Distribution</option>
-                    {% endif %}
-                    {% if visualizations.sentiment_bar %}
-                    <option value="sentiment">Sentiment Distribution</option>
-                    {% endif %}
-                    {% if visualizations.time_series %}
-                    <option value="time">Timeline</option>
-                    {% endif %}
-                </select>
-            </div>
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <select id="visualization-select" class="form-select w-auto">
+                <option value="" selected>Select a Visualization</option>
+                {% if visualizations.platform_pie %}
+                <option value="platform">Platform Distribution</option>
+                {% endif %}
+                {% if visualizations.type_pie %}
+                <option value="type">Content Type Distribution</option>
+                {% endif %}
+                {% if visualizations.sentiment_bar %}
+                <option value="sentiment">Sentiment Distribution</option>
+                {% endif %}
+                {% if visualizations.time_series %}
+                <option value="time">Timeline</option>
+                {% endif %}
+            </select>
             <div class="card-body">
                 <div id="visualization-container">
                     {% if visualizations.platform_pie %}
@@ -207,7 +208,7 @@
                 </h5>
                 <div class="d-flex align-items-center">
                     <span class="me-2">Sort by:</span>
-                    <div class="dropdown">
+                    <div class="dropdown bg-white">
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             {% if sort == 'created_at asc' %}
                                 Date Ascending
