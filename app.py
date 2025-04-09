@@ -129,7 +129,10 @@ def search():
 
     # Process the query - don't expand it unless it's the special wildcard query
     solr_query = raw_query
-    if raw_query != '*:*' and not raw_query.startswith('_text_:'):
+    if not raw_query or raw_query.strip() == "":
+        # For empty queries, return all documents (same as browse all)
+        solr_query = '*:*'
+    elif raw_query != '*:*' and not raw_query.startswith('_text_:'):
         # Use a simpler transformation that's less prone to expanding with each page
         solr_query = f'text:"{raw_query}" OR title:"{raw_query}"'
 

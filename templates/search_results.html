@@ -107,6 +107,7 @@
     <!-- Main content -->
     <div class="col-md-9">
         <!-- Search results header -->
+        <!-- Search results header -->
         <div class="card mb-4" style="border: none;">
             <div class="card-header bg-white text-black d-flex justify-content-between align-items-center" style="border-bottom: none; text-decoration: none;" >
                 <h4 class="mb-0" style="font-size: 1.0em; text-decoration: none; border-bottom: none; margin-bottom: 0;">Search Results for:</h4>
@@ -114,7 +115,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h5><small class="text-dark" style="font-size: 1.5em; margin-top: 0;">"{{ query if query != '*:*' else 'All Documents' }}"</small></h5>
+                        <h5><small class="text-dark" style="font-size: 1.5em; margin-top: 0;">"{{ query if query and query.strip() and query != '*:*' else 'All Documents' }}"</small></h5>
                         <div>
                             {% if selected_platform or selected_type or selected_sentiment or selected_feature and selected_feature != 'any' %}
                             <small class="text-dark">{{ 'Filers:' }}</small>
@@ -143,31 +144,35 @@
                     </div>
                     <div class="card mb-4" style="border: none;">
                         <span class="badge bg-white text-dark" style="font-size: 1.4em; font-weight: normal;">{{ num_found }} results found</span>
+                        
+                        <!-- Visualization selector moved here -->
+                        {% if visualizations %}
+                        <div class="mt-2">
+                            <select id="visualization-select" class="form-select">
+                                <option value="" selected>Select a Visualization</option>
+                                {% if visualizations.platform_pie %}
+                                <option value="platform">Platform Distribution</option>
+                                {% endif %}
+                                {% if visualizations.type_pie %}
+                                <option value="type">Content Type Distribution</option>
+                                {% endif %}
+                                {% if visualizations.sentiment_bar %}
+                                <option value="sentiment">Sentiment Distribution</option>
+                                {% endif %}
+                                {% if visualizations.time_series %}
+                                <option value="time">Timeline</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
 
-
-
-        <!-- Visualizations -->
+        <!-- Visualizations container (keep this part) -->
         {% if visualizations %}
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <select id="visualization-select" class="form-select w-auto">
-                <option value="" selected>Select a Visualization</option>
-                {% if visualizations.platform_pie %}
-                <option value="platform">Platform Distribution</option>
-                {% endif %}
-                {% if visualizations.type_pie %}
-                <option value="type">Content Type Distribution</option>
-                {% endif %}
-                {% if visualizations.sentiment_bar %}
-                <option value="sentiment">Sentiment Distribution</option>
-                {% endif %}
-                {% if visualizations.time_series %}
-                <option value="time">Timeline</option>
-                {% endif %}
-            </select>
+        <div class="card mb-4" style="border: none;">
             <div class="card-body">
                 <div id="visualization-container">
                     {% if visualizations.platform_pie %}
@@ -229,25 +234,16 @@
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
                     {% for doc in results %}
-                    <div class="list-group-item p-3">
+                    <a href="/document/{{ doc.id }}" class="list-group-item p-3 text-decoration-none text-dark">
+                        {% if doc.title %}
                         <div class="d-flex justify-content-between align-items-start">
                             <h5 class="mb-1">
-                                <a href="/document/{{ doc.id }}">
-                                    {% if doc.title %}
-                                        {{ doc.title
-                                            | replace('+', '')
-                                            | replace("['", '')
-                                            | replace("']", '')
-                                            | replace('["', '')
-                                            | replace('"]', '') }}
-                                    {% elif doc.text is sequence and doc.text is not string %} 
-                                        {% if doc.text.0|length > 100 %}
-                                            {{doc.text.0[:100]}} ...
-                                            {% else %}
-                                            {{doc.text.0}}
-                                            {% endif %}
-                                    {% endif %}
-                                </a>
+                                {{ doc.title
+                                    | replace('+', '')
+                                    | replace("['", '')
+                                    | replace("']", '')
+                                    | replace('["', '')
+                                    | replace('"]', '') }}
                             </h5>
                             <div>
                                 {% if doc.platform %} 
@@ -255,31 +251,38 @@
                                     {{ doc.platform|join(', ') }}
                                 </span>
                                 {% endif %}
-
-                                <!-- {% if doc.type %}
-                                 <span class="badge bg-dark">
-                                    {{ doc.type|join(', ') }}  
-                                </span>
-                                {% endif %} -->
                             </div>
                         </div>
-
-                        <p class="fw-light mb-1 fst-italic">
-                            {% if doc.text is sequence and doc.text is not string %}
-                                {% if doc.text[0]|length > 100 %}
-                                    {{ doc.text[0][:100] }} ...
-                                {% else %}
-                                    {{ doc.text[0] }}
+                        {% else %}
+                        <div class="d-flex justify-content-end">
+                            {% if doc.platform %} 
+                            <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '')|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}">
+                                {{ doc.platform|join(', ') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    
+                        <p class="fw-light {% if not doc.title %}mt-0{% else %}mb-1{% endif %} fst-italic">
+                            {% if doc.title %}
+                                {% if doc.text is sequence and doc.text is not string %}
+                                    {% if doc.text[0]|length > 100 %}
+                                        {{ doc.text[0][:100] }} ...
+                                    {% else %}
+                                        {{ doc.text[0] }}
+                                    {% endif %}
+                                {% elif doc.text %}
+                                    {% if doc.text|length > 100 %}
+                                        {{ doc.text[:100] }} ...
+                                    {% else %}
+                                        {{ doc.text }}
+                                    {% endif %}
                                 {% endif %}
-                            {% elif doc.text %}
-                                {% if doc.text|length > 100 %}
-                                    {{ doc.text[:100] }} ...
-                                {% else %}
-                                    {{ doc.text }}
-                                {% endif %}
+                            {% else %}
+                                {{ doc.text[0] if doc.text else doc.text }}
                             {% endif %}
                         </p>
-
+                    
                         <div class="d-flex justify-content-between align-items-center mt-2">
                             <div>
                                 {% if doc.sentiment %}
@@ -288,35 +291,21 @@
                                 {% elif 'negative' in doc.sentiment %}bg-danger
                                 {% else %}bg-secondary
                                 {% endif %}">
-
+                    
                                 {{ doc.sentiment|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}
                                 </span>
                                 {% endif %}
-
+                    
                                 {% if doc.created_at %}
                                 <small class="text-muted ms-2">{{ doc.created_at_formatted }}</small>
                                 {% endif %}
-
-                                <!-- {% if doc.score %}
-                                <small class="text-muted ms-2">Score: {{ doc.score }}</small>
-                                {% endif %} -->
-
+                    
                                 {% if doc.author %}
                                 <small class="text-muted ms-2">by: {{ doc.author|join(', ') }}</small>
                                 {% endif %}
                             </div>
-
-                            <div>
-                                {% if doc.content_quality or doc.pricing or doc.ui_ux or doc.technical or doc.customer_service %}
-                                <span class="badge bg-info" title="Has feature analysis">
-                                    <i class="bi bi-graph-up"></i> Analysis Available
-                                </span>
-                                {% endif %}
-
-                                <a href="/document/{{ doc.id }}" class="btn btn-sm btn-outline-primary ms-2">View Details</a>
-                            </div>
                         </div>
-                    </div>
+                    </a>
                     {% endfor %}
                 </div>
             </div>
