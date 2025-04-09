@@ -230,7 +230,7 @@ class EnhancedDataProcessor:
             feature_text = ""
             for keyword in keywords:
                 # Extract sentences containing feature keywords
-                pattern = r'[^.!?]*\b' + re.escape(keyword) + r'\b[^.!?]*[.!?]'
+                pattern = r'\b' + re.escape(keyword) + r'\b(?:\s+\w+)*'
                 matches = re.findall(pattern, text)
                 if matches:
                     feature_text += ' '.join(matches) + ' '
