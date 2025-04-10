@@ -23,6 +23,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def print_document_features(doc):
+    """Print the features of a document"""
+    doc_id = doc.get('id', 'Unknown ID')
+    print(f"Document {doc_id} features:")
+    
+    # List of features to check
+    features = ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']
+    
+    # Print each feature and its value if present
+    for feature in features:
+        if feature in doc:
+            value = doc.get(feature)
+            if isinstance(value, list) and value:
+                value = value[0]  # Handle Solr's list return format
+            print(f"  - {feature}: {value}")
+        else:
+            print(f"  - {feature}: Not available")
+    print("-" * 50)  # Print a separator line
 
 # Test Solr on startup
 def test_solr_connection():
@@ -157,13 +175,14 @@ def search():
     try:
         print(f"Solr Query: {solr_query}")
         print(f"Filter Queries: {fq}")
-
+        
         response = requests.get(f"{SOLR_URL}/select", params=params)
         response.raise_for_status()
         results = response.json()
 
         # Format created_at nicely for each doc
         for doc in results['response']['docs']:
+            print_document_features(doc)
             created_at = doc.get('created_at')
             if created_at and isinstance(created_at, list) and created_at[0]:
                 try:
@@ -255,7 +274,38 @@ def view_document(doc_id):
 
         if results['response']['numFound'] > 0:
             doc = results['response']['docs'][0]
-
+            
+            # Print features for debugging
+            print_document_features(doc)
+            
+            # Format created_at date nicely
+            if 'created_at' in doc and doc['created_at']:
+                created_at = doc['created_at']
+                if isinstance(created_at, list) and created_at[0]:
+                    try:
+                        dt = datetime.strptime(created_at[0], '%Y-%m-%dT%H:%M:%SZ')
+                        # Format: April 10, 2023
+                        doc['created_at_formatted'] = dt.strftime('%B %d, %Y')
+                    except ValueError:
+                        doc['created_at_formatted'] = created_at[0]
+                else:
+                    doc['created_at_formatted'] = created_at
+            
+            # Normalize feature values for the template
+            feature_fields = ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']
+            for field in feature_fields:
+                if field in doc:
+                    # Convert from list to single value if needed
+                    if isinstance(doc[field], list) and doc[field]:
+                        doc[field] = float(doc[field][0]) if doc[field][0] is not None else None
+                    # Ensure numeric value for progress bars
+                    elif doc[field] is not None:
+                        try:
+                            doc[field] = float(doc[field])
+                        except (ValueError, TypeError):
+                            # If conversion fails, set to None
+                            doc[field] = None
+            
             # Get related documents using parent_id from schema
             related_docs = []
             if 'parent_id' in doc and doc.get('parent_id'):
@@ -276,6 +326,17 @@ def view_document(doc_id):
 
                     if parent_results['response']['numFound'] > 0:
                         related_docs.append(parent_results['response']['docs'][0])
+                        parent_doc = parent_results['response']['docs'][0]
+                        # Format created_at for parent document too
+                        if 'created_at' in parent_doc and parent_doc['created_at']:
+                            created_at = parent_doc['created_at']
+                            if isinstance(created_at, list) and created_at[0]:
+                                try:
+                                    dt = datetime.strptime(created_at[0], '%Y-%m-%dT%H:%M:%SZ')
+                                    parent_doc['created_at_formatted'] = dt.strftime('%B %d, %Y')
+                                except ValueError:
+                                    parent_doc['created_at_formatted'] = created_at[0]
+                        related_docs.append(parent_doc)
 
             # Process keywords and entities properly
             keywords = []
@@ -310,7 +371,7 @@ def view_document(doc_id):
                         entities = []
 
             return render_template('document.html', doc=doc, related_docs=related_docs,
-                                   keywords=keywords, entities=entities)
+                                keywords=keywords, entities=entities)
         else:
             return render_template('error.html', message="Document not found"), 404
 
