@@ -4,6 +4,21 @@
 {% block title %}Document Detail{% endblock %}
 
 {% block content %}
+
+<!-- Add this near the top of your template for debugging -->
+<div style="display: none;">
+    <!-- This will be hidden but viewable in page source -->
+    <p>Debug - Raw features:</p>
+    <pre>
+    content_quality: {{ doc.content_quality|pprint }}
+    pricing: {{ doc.pricing|pprint }}
+    ui_ux: {{ doc.ui_ux|pprint }}
+    technical: {{ doc.technical|pprint }}
+    customer_service: {{ doc.customer_service|pprint }}
+    </pre>
+</div>
+
+
 <div class="card">
     <div class="card-header bg-primary text-white">
         <h4 class="mb-0">
@@ -82,7 +97,7 @@
         <div class="row">
             <div class="col-md-6">
                 <h5>Document Details:</h5>
-                <table class="table table-bordered">
+                <table class="table table">
                     <tbody>
                         <tr>
                             <th>Author</th>
@@ -113,7 +128,7 @@
                         {% if doc.created_at %}
                         <tr>
                             <th>Date</th>
-                            <td>{{ doc.created_at.0|replace('T', ' ')|replace('Z', '') }}</td>
+                            <td>{{ doc.created_at_formatted }}</td>
                         </tr>
                         {% endif %}
 
@@ -159,17 +174,17 @@
             {% if doc.content_quality is defined or doc.pricing is defined or doc.ui_ux is defined or doc.technical is defined or doc.customer_service is defined %}
             <div class="col-md-6">
                 <h5>Feature Analysis:</h5>
-                <table class="table table-bordered">
+                <table class="table table">
                     <tbody>
-                        {% if doc.content_quality is defined and doc.content_quality is not none and doc.content_quality is number %}
+                        {% if doc.content_quality is defined and doc.content_quality is not none %}
                         <tr>
-                            <th>Content Quality</th>
-                            <td>
-                                <div class="progress">
+                            <th style="width: 50%;">Content Quality</th> <!-- Set width for label column; just need to adjust this first one, the rest will follow suit -->
+                            <td style="width: 50%;"> <!-- Set width for progress bar column; add up to 100% -->
+                                <div class="progress" style="width: 100%;"> <!-- Make progress container full width -->
                                     <div class="progress-bar bg-success" role="progressbar"
-                                         style="width: {{ "%.0f"|format(doc.content_quality * 100) }}%;"
-                                         aria-valuenow="{{ "%.2f"|format(doc.content_quality) }}"
-                                         aria-valuemin="0" aria-valuemax="1">
+                                        style="width: {{ "%.0f"|format(doc.content_quality * 100) }}%;"
+                                        aria-valuenow="{{ "%.2f"|format(doc.content_quality) }}"
+                                        aria-valuemin="0" aria-valuemax="1">
                                         {{ "%.2f"|format(doc.content_quality) }}
                                     </div>
                                 </div>
@@ -177,15 +192,16 @@
                         </tr>
                         {% endif %}
 
-                        {% if doc.pricing is defined and doc.pricing is not none and doc.pricing is number %}
+                        <!-- Apply the same changes to the other feature progress bars -->
+                        {% if doc.pricing is defined and doc.pricing is not none %}
                         <tr>
-                            <th>Pricing</th>
-                            <td>
-                                <div class="progress">
+                            <th style="width: 30%;">Pricing</th>
+                            <td style="width: 70%;">
+                                <div class="progress" style="width: 100%;">
                                     <div class="progress-bar bg-info" role="progressbar"
-                                         style="width: {{ "%.0f"|format(doc.pricing * 100) }}%;"
-                                         aria-valuenow="{{ "%.2f"|format(doc.pricing) }}"
-                                         aria-valuemin="0" aria-valuemax="1">
+                                        style="width: {{ "%.0f"|format(doc.pricing * 100) }}%;"
+                                        aria-valuenow="{{ "%.2f"|format(doc.pricing) }}"
+                                        aria-valuemin="0" aria-valuemax="1">
                                         {{ "%.2f"|format(doc.pricing) }}
                                     </div>
                                 </div>
@@ -193,15 +209,15 @@
                         </tr>
                         {% endif %}
 
-                        {% if doc.ui_ux is defined and doc.ui_ux is not none and doc.ui_ux is number %}
+                        {% if doc.ui_ux is defined and doc.ui_ux is not none %}
                         <tr>
-                            <th>User Interface</th>
-                            <td>
-                                <div class="progress">
+                            <th style="width: 30%;">User Interface</th>
+                            <td style="width: 70%;">
+                                <div class="progress" style="width: 100%;">
                                     <div class="progress-bar bg-warning" role="progressbar"
-                                         style="width: {{ "%.0f"|format(doc.ui_ux * 100) }}%;"
-                                         aria-valuenow="{{ "%.2f"|format(doc.ui_ux) }}"
-                                         aria-valuemin="0" aria-valuemax="1">
+                                        style="width: {{ "%.0f"|format(doc.ui_ux * 100) }}%;"
+                                        aria-valuenow="{{ "%.2f"|format(doc.ui_ux) }}"
+                                        aria-valuemin="0" aria-valuemax="1">
                                         {{ "%.2f"|format(doc.ui_ux) }}
                                     </div>
                                 </div>
@@ -209,15 +225,15 @@
                         </tr>
                         {% endif %}
 
-                        {% if doc.technical is defined and doc.technical is not none and doc.technical is number %}
+                        {% if doc.technical is defined and doc.technical is not none %}
                         <tr>
-                            <th>Technical Performance</th>
-                            <td>
-                                <div class="progress">
+                            <th style="width: 30%;">Technical Performance</th>
+                            <td style="width: 70%;">
+                                <div class="progress" style="width: 100%;">
                                     <div class="progress-bar bg-danger" role="progressbar"
-                                         style="width: {{ "%.0f"|format(doc.technical * 100) }}%;"
-                                         aria-valuenow="{{ "%.2f"|format(doc.technical) }}"
-                                         aria-valuemin="0" aria-valuemax="1">
+                                        style="width: {{ "%.0f"|format(doc.technical * 100) }}%;"
+                                        aria-valuenow="{{ "%.2f"|format(doc.technical) }}"
+                                        aria-valuemin="0" aria-valuemax="1">
                                         {{ "%.2f"|format(doc.technical) }}
                                     </div>
                                 </div>
@@ -225,15 +241,15 @@
                         </tr>
                         {% endif %}
 
-                        {% if doc.customer_service is defined and doc.customer_service is not none and doc.customer_service is number %}
+                        {% if doc.customer_service is defined and doc.customer_service is not none %}
                         <tr>
-                            <th>Customer Service</th>
-                            <td>
-                                <div class="progress">
+                            <th style="width: 30%;">Customer Service</th>
+                            <td style="width: 70%;">
+                                <div class="progress" style="width: 100%;">
                                     <div class="progress-bar bg-primary" role="progressbar"
-                                         style="width: {{ "%.0f"|format(doc.customer_service * 100) }}%;"
-                                         aria-valuenow="{{ "%.2f"|format(doc.customer_service) }}"
-                                         aria-valuemin="0" aria-valuemax="1">
+                                        style="width: {{ "%.0f"|format(doc.customer_service * 100) }}%;"
+                                        aria-valuenow="{{ "%.2f"|format(doc.customer_service) }}"
+                                        aria-valuemin="0" aria-valuemax="1">
                                         {{ "%.2f"|format(doc.customer_service) }}
                                     </div>
                                 </div>
