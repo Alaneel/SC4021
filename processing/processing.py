@@ -13,6 +13,8 @@ from nltk.chunk import ne_chunk
 from langdetect import detect
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from huggingface_hub import InferenceClient
+from gensim.models.phrases import Phrases, Phraser
 from tqdm import tqdm
 
 # Download required NLTK resources
@@ -111,9 +113,42 @@ class EnhancedDataProcessor:
         print(f"Loaded {len(df)} records from {filepath}")
         return df
 
+    # def clean_text(self, text):
+    #     """
+    #     Clean and normalize text.
+
+    #     Args:
+    #         text (str): Text to clean
+
+    #     Returns:
+    #         str: Cleaned text
+    #     """
+    #     if pd.isna(text) or not isinstance(text, str):
+    #         return ""
+
+    #     # Convert to lowercase
+    #     text = text.lower()
+
+    #     # Remove URLs
+    #     text = re.sub(r'http\S+', '', text)
+
+    #     # Replacing multi spaces/new lines to one space
+    #     text = re.sub(r'\s+', ' ', text).strip()
+
+    #     # Remove special characters and numbers
+    #     text = re.sub(r'[^\w\s]', '', text)
+    #     text = re.sub(r'\d+', '', text)
+
+    #     # Tokenize and remove stopwords
+    #     tokens = word_tokenize(text)
+    #     tokens = [self.lemmatizer.lemmatize(word) for word in tokens if word not in self.stop_words]
+
+    #     # Join tokens back to text
+    #     cleaned_text = ' '.join(tokens)
+    #     return cleaned_text
     def clean_text(self, text):
         """
-        Clean and normalize text.
+        Clean and normalize text while preserving meaning.
 
         Args:
             text (str): Text to clean
@@ -130,20 +165,40 @@ class EnhancedDataProcessor:
         # Remove URLs
         text = re.sub(r'http\S+', '', text)
 
-        # Replacing multi spaces/new lines to one space
+        # Replace multi spaces/new lines with a single space
         text = re.sub(r'\s+', ' ', text).strip()
+
+        # Normalize comments with elongated words e.g. waaaaaaay
+        text = re.sub(r'(.)\1{2,}',r'\1', text)
+
+        # Allow specific punctuation (e.g., periods, hyphens)
+        text = re.sub(r'[^\w\s\.\-]', '', text)
 
         # Remove special characters and numbers
         text = re.sub(r'[^\w\s]', '', text)
         text = re.sub(r'\d+', '', text)
 
-        # Tokenize and remove stopwords
+        # Tokenize the text
         tokens = word_tokenize(text)
-        tokens = [self.lemmatizer.lemmatize(word) for word in tokens if word not in self.stop_words]
 
-        # Join tokens back to text
+        # Filter stopwords 
+        stop_words = set(stopwords.words('english'))
+        custom_stop_words = stop_words -  {"not", "no", "if", "and", "but", "does", "did", "of", "out"}
+        tokens = [word for word in tokens if word not in custom_stop_words]
+
+        # Apply lemmatization
+        tokens = [self.lemmatizer.lemmatize(word) for word in tokens]
+
+        # Detect and preserve multi-word phrases
+        phrases = Phrases([tokens])
+        bigram = Phraser(phrases)
+        tokens = bigram[tokens]
+
+        # Rejoin tokens back to text
         cleaned_text = ' '.join(tokens)
+
         return cleaned_text
+
 
     def detect_language(self, text):
         """
@@ -208,6 +263,32 @@ class EnhancedDataProcessor:
             sentiment = 'neutral'
 
         return sentiment, compound_score
+    
+    # def analyze_sentiment_hugging_face(self, text):
+    #     """
+    #     This function sends the text to a hugging face model for sentiment analysis
+    #     It takes in the text to analyze and returns a tuple which contains the sentiment category and confidence score
+    #     """
+    #     if not text:
+    #         return 'neutral', 0.0
+        
+    #     try:
+    #         # Send the document to the Hugging Face model for sentiment analysis
+    #         response = self.client.text_classification(text, model=self.hf_model_name)
+
+    #         # The model should return a response in the form of a list containing the label and confidence score
+    #         if response and isinstance(response, list):
+    #             # Extract the label and score from the first prediction
+    #             top_prediction = response[0]
+    #             label = top_prediction['label'].lower()  # Normalize label to lowercase
+    #             score = top_prediction['score']
+    #             return label, score
+    #         else:
+    #             raise ValueError("Unexpected response format from Hugging Face API.")
+    #     except Exception as e:
+    #         # Handle errors gracefully and log them
+    #         print(f"Error analyzing sentiment for document: {e}")
+    #         return 'unknown', 0.0
 
     def extract_features(self, text):
         """
@@ -381,6 +462,12 @@ class EnhancedDataProcessor:
         sentiment_results = df[text_column].apply(self.analyze_sentiment)
         df['sentiment'] = sentiment_results.apply(lambda x: x[0])
         df['sentiment_score'] = sentiment_results.apply(lambda x: x[1])
+
+        # # Analyze sentiment using Hugging Face model
+        # print("Analyzing sentiment using Hugging Face model...")
+        # sentiment_results_hf = df[text_column].apply(self.analyze_sentiment_hugging_face)
+        # df['sentiment_hf'] = sentiment_results_hf.apply(lambda x: x[0])
+        # df['sentiment_score_hf'] = sentiment_results_hf.apply(lambda x: x[1])
 
         # Extract feature scores
         print("Extracting feature scores...")
