@@ -165,6 +165,19 @@
                     </div>
                     {% endif %}
                 </div>
+
+                {% if spellcheck_suggestions and query != '*:*' and num_found == 0 %}
+                <div class="alert alert-info bg-white" style="border: none" id="spellcheck-suggestion">
+                    <p>Did you mean: 
+                        {% set corrected_phrase = spellcheck_suggestions.values()|map(attribute=0)|join(' ') %}
+                        <a href="/search?q={{ corrected_phrase|urlencode }}{% for key, value in request.args.items() %}{% if key != 'q' and value %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}" onclick="document.getElementById('spellcheck-suggestion').style.display='none';">
+                            {% for word, suggestions in spellcheck_suggestions.items() %}
+                                {{ suggestions[0] }}{% if not loop.last %} {% endif %}
+                            {% endfor %}
+                        </a>?
+                    </p>
+                </div>
+                {% endif %}
                 
                 <!-- Filters below -->
                 <div class="mt-2">
