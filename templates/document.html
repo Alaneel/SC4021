@@ -20,7 +20,7 @@
 
 
 <div class="card">
-    <div class="card-header bg-primary text-white">
+    <div class="card-header bg-secondary text-white">
         <h4 class="mb-0">
             {% if doc.title %}
                 {{ doc.title }}
@@ -291,18 +291,18 @@
         <div class="mt-4">
             <div class="row">
                 {% if keywords and keywords|length > 0 %}
-                <div class="col-md-6">
+                <div>
                     <h5>Keywords:</h5>
                     <div>
                         {% for keyword in keywords %}
-                        <span class="badge bg-primary me-1 mb-1">{{ keyword }}</span>
+                        <span class="badge bg-white me-1 mb-1 text-black" style="border: 2px solid black">{{ keyword }}</span>
                         {% endfor %}
                     </div>
                 </div>
                 {% endif %}
 
                 {% if entities and entities|length > 0 %}
-                <div class="col-md-6">
+                <div>
                     <h5>Entities:</h5>
                     <div>
                         {% for entity in entities %}
