@@ -5,7 +5,6 @@
 
 {% block head %}
 {{ super() }}
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -13,7 +12,7 @@
     <!-- Search filters sidebar -->
     <div class="col-md-3">
         <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
+            <div class="card-header bg-secondary text-white">
                 <h5 class="mb-0">Filter Results</h5>
             </div>
             <div class="card-body">
@@ -80,7 +79,7 @@
                     </div>
 
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <button type="submit" class="btn btn-primary bg-light text-dark" style="border: 2px solid #808080; font-weight: bold;">Apply Filters</button>
                     </div>
                 </form>
             </div>
@@ -100,117 +99,133 @@
                 </ul>
             </div>
         </div>
+
+
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">About Dataset</h5>
+            </div>
+            <div class="card-body" style="font-size: 0.7rem;">
+                <p>This search engine indexes streaming service opinions from Reddit and other platforms. The dataset includes:</p>
+                <ul>
+                    <li>Comments and posts from streaming service subreddits</li>
+                    <li>Sentiment analysis (positive, negative, neutral)</li>
+                    <li>Feature-specific ratings (content quality, pricing, UI/UX, technical performance, customer service)</li>
+                    <li>Keywords and entity extraction</li>
+                    <li>Post metadata (author, date, score, etc.)</li>
+                </ul>
+                <p>Use the search filters to explore opinions about specific streaming platforms, features, or sentiments.</p>
+            </div>
+        </div>
     </div>
 
     <!-- Main content -->
     <div class="col-md-9">
         <!-- Search results header -->
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">Search Results</h4>
-                <div>
-                    <span class="badge bg-light text-dark">{{ num_found }} results found</span>
-                </div>
+        <div class="card mb-4" style="border: none;">
+            <div class="card-header bg-white text-black d-flex justify-content-between align-items-center" style="border-bottom: none; text-decoration: none;" >
+                <form action="/search" method="get" class="input-group w-100">
+                    <input type="text" class="form-control" id="q" name="q" placeholder="Search documents..." value="{{ query if query and query.strip() and query != '*:*' else '' }}">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        &#128269; Search
+                    </button>
+                    
+                    <!-- Hidden fields to preserve filters -->
+                    <input type="hidden" name="platform" value="{{ selected_platform or '' }}">
+                    <input type="hidden" name="type" value="{{ selected_type or '' }}">
+                    <input type="hidden" name="sentiment" value="{{ selected_sentiment or '' }}">
+                    <input type="hidden" name="feature" value="{{ selected_feature or 'any' }}">
+                    <input type="hidden" name="start_date" value="{{ start_date or '' }}">
+                    <input type="hidden" name="end_date" value="{{ end_date or '' }}">
+                </form>
             </div>
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
+                    <!-- Results count on the left -->
+                    <span class="badge bg-white text-dark" style="font-size: 1.4em; font-weight: normal;">{{ num_found }} results found</span>
+                    
+                    <!-- Visualization selector flush right -->
+                    {% if visualizations %}
                     <div>
-                        <h5>Query: <small class="text-muted">{{ query if query != '*:*' else 'All Documents' }}</small></h5>
-                        <div>
-                            {% if selected_platform %}
-                            <span class="badge bg-info me-1">Platform: {{ selected_platform }}</span>
+                        <select id="visualization-select" class="form-select">
+                            <option value="" selected>Select a Visualization</option>
+                            {% if visualizations.platform_pie %}
+                            <option value="platform">Platform Distribution</option>
                             {% endif %}
-
-                            {% if selected_type %}
-                            <span class="badge bg-dark me-1">Type: {{ selected_type }}</span>
+                            {% if visualizations.type_pie %}
+                            <option value="type">Content Type Distribution</option>
                             {% endif %}
-
-                            {% if selected_sentiment %}
-                            <span class="badge
-                                  {% if selected_sentiment == 'positive' %}bg-success
-                                  {% elif selected_sentiment == 'negative' %}bg-danger
-                                  {% else %}bg-secondary{% endif %} me-1">
-                                Sentiment: {{ selected_sentiment }}
-                            </span>
+                            {% if visualizations.sentiment_bar %}
+                            <option value="sentiment">Sentiment Distribution</option>
                             {% endif %}
-
-                            {% if selected_feature and selected_feature != 'any' %}
-                            <span class="badge bg-primary me-1">Feature: {{ selected_feature }}</span>
+                            {% if visualizations.time_series %}
+                            <option value="time">Timeline</option>
                             {% endif %}
-                        </div>
+                        </select>
                     </div>
-                    <div>
-                        <a href="/" class="btn btn-outline-secondary">New Search</a>
-                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Filters below -->
+                <div class="mt-2">
+                    {% if selected_platform or selected_type or selected_sentiment or selected_feature and selected_feature != 'any' %}
+                    <small class="text-dark">{{ 'Filters:' }}</small>
+                        {% if selected_platform %}
+                        <span class="badge bg-info me-1">Platform: {{ selected_platform }}</span>
+                        {% endif %}
+            
+                        {% if selected_type %}
+                        <span class="badge bg-dark me-1">Type: {{ selected_type }}</span>
+                        {% endif %}
+            
+                        {% if selected_sentiment %}
+                        <span class="badge
+                            {% if selected_sentiment == 'positive' %}bg-success
+                            {% elif selected_sentiment == 'negative' %}bg-danger
+                            {% else %}bg-secondary{% endif %} me-1">
+                            Sentiment: {{ selected_sentiment }}
+                        </span>
+                        {% endif %}
+            
+                        {% if selected_feature and selected_feature != 'any' %}
+                        <span class="badge bg-primary me-1">Feature: {{ selected_feature }}</span>
+                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
-        </div>
 
-        <!-- Visualizations -->
+        <!-- Visualizations container (keep this part) -->
         {% if visualizations %}
-        <div class="card mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">Data Visualizations</h5>
-            </div>
-            <div class="card-body">
-                <ul class="nav nav-tabs" id="visualizationTabs" role="tablist">
-                    {% if visualizations.platform_pie %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="platform-tab" data-bs-toggle="tab" data-bs-target="#platform" type="button" role="tab" aria-controls="platform" aria-selected="true">Platforms</button>
-                    </li>
-                    {% endif %}
-
-                    {% if visualizations.type_pie %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if not visualizations.platform_pie %}active{% endif %}" id="type-tab" data-bs-toggle="tab" data-bs-target="#type" type="button" role="tab" aria-controls="type" aria-selected="{% if not visualizations.platform_pie %}true{% else %}false{% endif %}">Content Types</button>
-                    </li>
-                    {% endif %}
-
-                    {% if visualizations.sentiment_bar %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if not visualizations.platform_pie and not visualizations.type_pie %}active{% endif %}" id="sentiment-tab" data-bs-toggle="tab" data-bs-target="#sentiment" type="button" role="tab" aria-controls="sentiment" aria-selected="{% if not visualizations.platform_pie and not visualizations.type_pie %}true{% else %}false{% endif %}">Sentiment</button>
-                    </li>
-                    {% endif %}
-
-                    {% if visualizations.time_series %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}active{% endif %}" id="time-tab" data-bs-toggle="tab" data-bs-target="#time" type="button" role="tab" aria-controls="time" aria-selected="{% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}true{% else %}false{% endif %}">Timeline</button>
-                    </li>
-                    {% endif %}
-                </ul>
-
-                <div class="tab-content pt-3" id="visualizationTabContent">
-                    {% if visualizations.platform_pie %}
-                    <div class="tab-pane fade show active" id="platform" role="tabpanel" aria-labelledby="platform-tab">
-                        <div id="platform-chart" style="width:100%; height:400px;"></div>
-                    </div>
-                    {% endif %}
-
-                    {% if visualizations.type_pie %}
-                    <div class="tab-pane fade {% if not visualizations.platform_pie %}show active{% endif %}" id="type" role="tabpanel" aria-labelledby="type-tab">
-                        <div id="type-chart" style="width:100%; height:400px;"></div>
-                    </div>
-                    {% endif %}
-
-                    {% if visualizations.sentiment_bar %}
-                    <div class="tab-pane fade {% if not visualizations.platform_pie and not visualizations.type_pie %}show active{% endif %}" id="sentiment" role="tabpanel" aria-labelledby="sentiment-tab">
-                        <div id="sentiment-chart" style="width:100%; height:400px;"></div>
-                    </div>
-                    {% endif %}
-
-                    {% if visualizations.time_series %}
-                    <div class="tab-pane fade {% if not visualizations.platform_pie and not visualizations.type_pie and not visualizations.sentiment_bar %}show active{% endif %}" id="time" role="tabpanel" aria-labelledby="time-tab">
-                        <div id="time-chart" style="width:100%; height:400px;"></div>
-                    </div>
-                    {% endif %}
+        <div class="card mb-4" style="border: none">
+            <div id="visualization-container">
+                {% if visualizations.platform_pie %}
+                <div id="platform-chart-container" class="visualization-chart" style="display: none;">
+                    <div id="platform-chart" style="width:100%; height:400px;"></div>
                 </div>
+                {% endif %}
+                {% if visualizations.type_pie %}
+                <div id="type-chart-container" class="visualization-chart" style="display: none;">
+                    <div id="type-chart" style="width:100%; height:400px;"></div>
+                </div>
+                {% endif %}
+                {% if visualizations.sentiment_bar %}
+                <div id="sentiment-chart-container" class="visualization-chart" style="display: none;">
+                    <div id="sentiment-chart" style="width:100%; height:400px;"></div>
+                </div>
+                {% endif %}
+                {% if visualizations.time_series %}
+                <div id="time-chart-container" class="visualization-chart" style="display: none;">
+                    <div id="time-chart" style="width:100%; height:400px;"></div>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
 
+
         <!-- Search results -->
         <div class="card mb-4">
-            <div class="card-header bg-light">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                 {% if num_found > 0 %}
                     Documents ({{ start + 1 }}-{{ start + results|length }} of {{ num_found }})
@@ -218,29 +233,39 @@
                     No Documents Found
                 {% endif %}
                 </h5>
+                <div class="d-flex align-items-center">
+                    <span class="me-2">Sort by:</span>
+                    <div class="dropdown bg-white">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            {% if sort == 'created_at asc' %}
+                                Date Ascending
+                            {% elif sort == 'created_at desc' %}
+                                Date Descending
+                            {% else %}
+                                Relavance
+                            {% endif %}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sortDropdown">
+                            <li><a class="dropdown-item" href="/search?q={{ query|urlencode }}&start=0&rows={{ rows }}&sort=created_at asc{% if selected_platform %}&platform={{ selected_platform|urlencode }}{% endif %}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment|urlencode }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature|urlencode }}{% endif %}{% if start_date %}&start_date={{ start_date|urlencode }}{% endif %}{% if end_date %}&end_date={{ end_date|urlencode }}{% endif %}">Date Ascending</a></li>
+                            <li><a class="dropdown-item" href="/search?q={{ query|urlencode }}&start=0&rows={{ rows }}&sort=created_at desc{% if selected_platform %}&platform={{ selected_platform|urlencode }}{% endif %}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment|urlencode }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature|urlencode }}{% endif %}{% if start_date %}&start_date={{ start_date|urlencode }}{% endif %}{% if end_date %}&end_date={{ end_date|urlencode }}{% endif %}">Date Descending</a></li>
+                            <li><a class="dropdown-item" href="/search?q={{ query|urlencode }}&start=0&rows={{ rows }}&sort=score desc{% if selected_platform %}&platform={{ selected_platform|urlencode }}{% endif %}{% if selected_type %}&type={{ selected_type|urlencode }}{% endif %}{% if selected_sentiment %}&sentiment={{ selected_sentiment|urlencode }}{% endif %}{% if selected_feature and selected_feature != 'any' %}&feature={{ selected_feature|urlencode }}{% endif %}{% if start_date %}&start_date={{ start_date|urlencode }}{% endif %}{% if end_date %}&end_date={{ end_date|urlencode }}{% endif %}">Relavance</a></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
                     {% for doc in results %}
-                    <div class="list-group-item p-3">
+                    <a href="/document/{{ doc.id }}" class="list-group-item p-3 text-decoration-none text-dark">
+                        {% if doc.title %}
                         <div class="d-flex justify-content-between align-items-start">
                             <h5 class="mb-1">
-                                <a href="/document/{{ doc.id }}">
-                                    {% if doc.title %}
-                                        {{ doc.title
-                                            | replace('+', '')
-                                            | replace("['", '')
-                                            | replace("']", '')
-                                            | replace('["', '')
-                                            | replace('"]', '') }}
-                                    {% elif doc.text is sequence and doc.text is not string %} 
-                                        {% if doc.text.0|length > 100 %}
-                                            {{doc.text.0[:100]}} ...
-                                            {% else %}
-                                            {{doc.text.0}}
-                                            {% endif %}
-                                    {% endif %}
-                                </a>
+                                {{ doc.title
+                                    | replace('+', '')
+                                    | replace("['", '')
+                                    | replace("']", '')
+                                    | replace('["', '')
+                                    | replace('"]', '') }}
                             </h5>
                             <div>
                                 {% if doc.platform %} 
@@ -248,32 +273,38 @@
                                     {{ doc.platform|join(', ') }}
                                 </span>
                                 {% endif %}
-
-                                <!-- {% if doc.type %}
-                                <span class="badge bg-dark">
-                                    {{ doc.type|join(', ') }}  
-                                </span>
-                                {% endif %} -->
-
                             </div>
                         </div>
-
-                        <p class="fw-light mb-1 fst-italic">
-                            {% if doc.text is sequence and doc.text is not string %}
-                                {% if doc.text[0]|length > 100 %}
-                                    {{ doc.text[0][:100] }} ...
-                                {% else %}
-                                    {{ doc.text[0] }}
+                        {% else %}
+                        <div class="d-flex justify-content-end">
+                            {% if doc.platform %} 
+                            <span class="platform-tag platform-{{ doc.platform|lower|replace('+', '')|replace(' ', '')|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}">
+                                {{ doc.platform|join(', ') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    
+                        <p class="fw-light {% if not doc.title %}mt-0{% else %}mb-1{% endif %} fst-italic">
+                            {% if doc.title %}
+                                {% if doc.text is sequence and doc.text is not string %}
+                                    {% if doc.text[0]|length > 100 %}
+                                        {{ doc.text[0][:100] }} ...
+                                    {% else %}
+                                        {{ doc.text[0] }}
+                                    {% endif %}
+                                {% elif doc.text %}
+                                    {% if doc.text|length > 100 %}
+                                        {{ doc.text[:100] }} ...
+                                    {% else %}
+                                        {{ doc.text }}
+                                    {% endif %}
                                 {% endif %}
-                            {% elif doc.text %}
-                                {% if doc.text|length > 100 %}
-                                    {{ doc.text[:100] }} ...
-                                {% else %}
-                                    {{ doc.text }}
-                                {% endif %}
-                            {% endif %}                        
+                            {% else %}
+                                {{ doc.text[0] if doc.text else doc.text }}
+                            {% endif %}
                         </p>
-
+                    
                         <div class="d-flex justify-content-between align-items-center mt-2">
                             <div>
                                 {% if doc.sentiment %}
@@ -282,35 +313,20 @@
                                 {% elif 'negative' in doc.sentiment %}bg-danger
                                 {% else %}bg-secondary
                                 {% endif %}">
-
                                 {{ doc.sentiment|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}
                                 </span>
                                 {% endif %}
-
+                    
                                 {% if doc.created_at %}
-                                <small class="text-muted ms-2">{{ doc.created_at|replace('T', ' ')|replace('Z', '')|replace("['",'')|replace("']",'') }}</small>
+                                <small class="text-muted ms-2">{{ doc.created_at_formatted }}</small>
                                 {% endif %}
-
-                                {% if doc.score %}
-                                <small class="text-muted ms-2">Score: {{ doc.score }}</small>
-                                {% endif %}
-
+                    
                                 {% if doc.author %}
                                 <small class="text-muted ms-2">by: {{ doc.author|join(', ') }}</small>
                                 {% endif %}
                             </div>
-
-                            <div>
-                                {% if doc.content_quality or doc.pricing or doc.ui_ux or doc.technical or doc.customer_service %}
-                                <span class="badge bg-info" title="Has feature analysis">
-                                    <i class="bi bi-graph-up"></i> Analysis Available
-                                </span>
-                                {% endif %}
-
-                                <a href="/document/{{ doc.id }}" class="btn btn-sm btn-outline-primary ms-2">View Details</a>
-                            </div>
                         </div>
-                    </div>
+                    </a>
                     {% endfor %}
                 </div>
             </div>
@@ -354,9 +370,9 @@
     </div>
 </div>
 
-{% if visualizations %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize all charts (hidden by default)
         {% if visualizations.platform_pie %}
         const platformChart = JSON.parse('{{ visualizations.platform_pie|safe }}');
         Plotly.newPlot('platform-chart', platformChart.data, platformChart.layout);
@@ -376,7 +392,29 @@
         const timeChart = JSON.parse('{{ visualizations.time_series|safe }}');
         Plotly.newPlot('time-chart', timeChart.data, timeChart.layout);
         {% endif %}
+
+        // Handle dropdown change
+        const select = document.getElementById('visualization-select');
+        const containers = document.querySelectorAll('.visualization-chart');
+
+        select.addEventListener('change', function() {
+            const selectedValue = this.value;
+
+            // Hide all charts
+            containers.forEach(container => {
+                container.style.display = 'none';
+            });
+
+            // Show the selected chart and resize it
+            if (selectedValue) {
+                const selectedContainer = document.getElementById(`${selectedValue}-chart-container`);
+                if (selectedContainer) {
+                    selectedContainer.style.display = 'block';
+                    const chartDiv = document.getElementById(`${selectedValue}-chart`);
+                    Plotly.Plots.resize(chartDiv); // Resize to ensure proper rendering
+                }
+            }
+        });
     });
 </script>
-{% endif %}
 {% endblock %}

@@ -23,6 +23,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def print_document_features(doc):
+    """Print the features of a document"""
+    doc_id = doc.get('id', 'Unknown ID')
+    print(f"Document {doc_id} features:")
+    
+    # List of features to check
+    features = ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']
+    
+    # Print each feature and its value if present
+    for feature in features:
+        if feature in doc:
+            value = doc.get(feature)
+            if isinstance(value, list) and value:
+                value = value[0]  # Handle Solr's list return format
+            print(f"  - {feature}: {value}")
+        else:
+            print(f"  - {feature}: Not available")
+    print("-" * 50)  # Print a separator line
 
 # Test Solr on startup
 def test_solr_connection():
@@ -98,6 +116,9 @@ def search():
     rows = int(request.args.get('rows', 10))
     start = int(request.args.get('start', 0))
 
+    # Get sort parameter, default to 'score desc'
+    sort = request.args.get('sort', 'score desc')
+
     # Build filter queries with any necessary escaping
     fq = []
     if platform:
@@ -112,12 +133,24 @@ def search():
     if feature and feature != 'any':
         fq.append(f'{feature}:[0.5 TO *]')
 
+    '''
     if start_date and end_date:
         fq.append(f'created_at:[{start_date}T00:00:00Z TO {end_date}T23:59:59Z]')
+    '''
+
+    # Modified date filtering to handle start_date and/or end_date
+    if start_date or end_date:
+        # Default to unbounded ranges if one date is missing
+        start_range = start_date + 'T00:00:00Z' if start_date else '*'
+        end_range = end_date + 'T23:59:59Z' if end_date else '*'
+        fq.append(f'created_at:[{start_range} TO {end_range}]')
 
     # Process the query - don't expand it unless it's the special wildcard query
     solr_query = raw_query
-    if raw_query != '*:*' and not raw_query.startswith('_text_:'):
+    if not raw_query or raw_query.strip() == "":
+        # For empty queries, return all documents (same as browse all)
+        solr_query = '*:*'
+    elif raw_query != '*:*' and not raw_query.startswith('_text_:'):
         # Use a simpler transformation that's less prone to expanding with each page
         solr_query = f'text:"{raw_query}" OR title:"{raw_query}"'
 
@@ -134,7 +167,7 @@ def search():
         'facet.range.start': 'NOW-1YEAR',
         'facet.range.end': 'NOW',
         'facet.range.gap': '+1MONTH',
-        'sort': 'score desc',
+        'sort': sort,
         'fl': 'id,text,cleaned_text,full_text,cleaned_full_text,title,platform,source,created_at,score,type,author,subreddit,permalink,parent_id,num_comments,word_count,sentiment,sentiment_score,subjectivity_score,content_quality,pricing,ui_ux,technical,customer_service',
         'wt': 'json',
     }
@@ -142,10 +175,24 @@ def search():
     try:
         print(f"Solr Query: {solr_query}")
         print(f"Filter Queries: {fq}")
-
+        
         response = requests.get(f"{SOLR_URL}/select", params=params)
         response.raise_for_status()
         results = response.json()
+
+        # Format created_at nicely for each doc
+        for doc in results['response']['docs']:
+            print_document_features(doc)
+            created_at = doc.get('created_at')
+            if created_at and isinstance(created_at, list) and created_at[0]:
+                try:
+                    dt = datetime.strptime(created_at[0], '%Y-%m-%dT%H:%M:%SZ')
+                    # doc['created_at_formatted'] = dt.strftime('%B %-d, %Y')  # Linux/macOS
+                    doc['created_at_formatted'] = dt.strftime('%B %#d, %Y')  # Windows
+                except ValueError:
+                    doc['created_at_formatted'] = created_at[0]  # fallback raw date
+            else:
+                doc['created_at_formatted'] = ''
 
         # Get actual number of results
         num_found = results['response'].get('numFound', 0)
@@ -202,7 +249,8 @@ def search():
             selected_feature=feature,
             start_date=start_date,
             end_date=end_date,
-            visualizations=visualizations
+            visualizations=visualizations,
+            sort=sort
         )
     except Exception as e:
         error_message = f"Error searching Solr: {str(e)}"
@@ -226,7 +274,38 @@ def view_document(doc_id):
 
         if results['response']['numFound'] > 0:
             doc = results['response']['docs'][0]
-
+            
+            # Print features for debugging
+            print_document_features(doc)
+            
+            # Format created_at date nicely
+            if 'created_at' in doc and doc['created_at']:
+                created_at = doc['created_at']
+                if isinstance(created_at, list) and created_at[0]:
+                    try:
+                        dt = datetime.strptime(created_at[0], '%Y-%m-%dT%H:%M:%SZ')
+                        # Format: April 10, 2023
+                        doc['created_at_formatted'] = dt.strftime('%B %d, %Y')
+                    except ValueError:
+                        doc['created_at_formatted'] = created_at[0]
+                else:
+                    doc['created_at_formatted'] = created_at
+            
+            # Normalize feature values for the template
+            feature_fields = ['content_quality', 'pricing', 'ui_ux', 'technical', 'customer_service']
+            for field in feature_fields:
+                if field in doc:
+                    # Convert from list to single value if needed
+                    if isinstance(doc[field], list) and doc[field]:
+                        doc[field] = float(doc[field][0]) if doc[field][0] is not None else None
+                    # Ensure numeric value for progress bars
+                    elif doc[field] is not None:
+                        try:
+                            doc[field] = float(doc[field])
+                        except (ValueError, TypeError):
+                            # If conversion fails, set to None
+                            doc[field] = None
+            
             # Get related documents using parent_id from schema
             related_docs = []
             if 'parent_id' in doc and doc.get('parent_id'):
@@ -247,6 +326,17 @@ def view_document(doc_id):
 
                     if parent_results['response']['numFound'] > 0:
                         related_docs.append(parent_results['response']['docs'][0])
+                        parent_doc = parent_results['response']['docs'][0]
+                        # Format created_at for parent document too
+                        if 'created_at' in parent_doc and parent_doc['created_at']:
+                            created_at = parent_doc['created_at']
+                            if isinstance(created_at, list) and created_at[0]:
+                                try:
+                                    dt = datetime.strptime(created_at[0], '%Y-%m-%dT%H:%M:%SZ')
+                                    parent_doc['created_at_formatted'] = dt.strftime('%B %d, %Y')
+                                except ValueError:
+                                    parent_doc['created_at_formatted'] = created_at[0]
+                        related_docs.append(parent_doc)
 
             # Process keywords and entities properly
             keywords = []
@@ -281,7 +371,7 @@ def view_document(doc_id):
                         entities = []
 
             return render_template('document.html', doc=doc, related_docs=related_docs,
-                                   keywords=keywords, entities=entities)
+                                keywords=keywords, entities=entities)
         else:
             return render_template('error.html', message="Document not found"), 404
 
@@ -342,6 +432,7 @@ def generate_visualizations(facets, query):
         platform_data = []
         platform_facets = facet_fields['platform']
 
+
         for i in range(0, len(platform_facets), 2):
             if i + 1 < len(platform_facets) and platform_facets[i + 1] > 0:
                 platform_data.append({
@@ -349,14 +440,74 @@ def generate_visualizations(facets, query):
                     'count': platform_facets[i + 1]
                 })
 
-        if platform_data:
-            df = pd.DataFrame(platform_data)
-            fig = px.pie(df, values='count', names='platform',
-                         title=f'Platform Distribution for query: {query}')
-            visualizations['platform_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+        unique_platforms = {entry['platform'] for entry in platform_data}
+        unique_platforms = len(unique_platforms)
 
-    # Similar implementations for type_pie, sentiment_bar, and time_series
-    # (Implementation abbreviated for clarity)
+        if platform_data:
+            if unique_platforms > 1:
+                df = pd.DataFrame(platform_data)
+                fig = px.pie(df, values='count', names='platform',
+                            title=f'Platform Distribution for query: {query}')
+                visualizations['platform_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+    
+    if 'type' in facet_fields:
+        type_data = []
+        type_facets = facet_fields['type']
+
+        for i in range(0, len(type_facets), 2):
+            if i + 1 < len(type_facets) and type_facets[i + 1] > 0:
+                type_data.append({
+                    'type': type_facets[i],
+                    'count': type_facets[i + 1]
+                })
+
+        unique_type = {entry['type'] for entry in type_data}
+        unique_type = len(unique_type)
+
+        if type_data:
+            if unique_type > 1:
+                df = pd.DataFrame(type_data)
+                fig = px.pie(df, values='count', names='type',
+                            title=f'Type Distribution for query: {query}')
+                visualizations['type_pie'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+
+    if 'sentiment' in facet_fields:
+        sentiment_data = []
+        sentiment_facets = facet_fields['sentiment']
+
+        for i in range(0, len(sentiment_facets), 2):
+            if i + 1 < len(sentiment_facets) and sentiment_facets[i + 1] > 0:
+                sentiment_data.append({
+                    'sentiment':sentiment_facets[i],
+                    'count':sentiment_facets[i + 1]
+                })
+
+        unique_sentiments = {entry['sentiment'] for entry in sentiment_data}
+        unique_sentiments = len(unique_sentiments)
+
+        if sentiment_data:
+            if unique_sentiments > 1:
+                df = pd.DataFrame(sentiment_data)
+                fig = px.bar(df, x = 'sentiment', y='count',
+                            title=f'Sentiment Distribution for query: {query}')
+                visualizations['sentiment_bar'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        if 'created_at' in facets.get('facet_ranges', {}):
+            time_data = []
+            time_facets = facets['facet_ranges']['created_at']['counts']
+            for i in range(0, len(time_facets), 2):
+                if i + 1 < len(time_facets) and time_facets[i + 1] > 0:
+                    time_data.append({
+                        'date': time_facets[i],
+                        'count': time_facets[i + 1]
+                    })
+            if time_data:
+                df = pd.DataFrame(time_data)
+                fig = px.line(df, x='date', y='count',
+                            title=f'Timeline for query: {query}')
+                visualizations['time_series'] = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
     return visualizations
 

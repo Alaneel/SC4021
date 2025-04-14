@@ -66,13 +66,17 @@ for _, row in tqdm(df.iterrows(), total=len(df), desc="Preparing documents"):
             # Handle different date formats
             date_str = row['created_utc']
             try:
-                date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                # Try DD/MM/YYYY HH:MM format first
+                date_obj = datetime.strptime(date_str, '%d/%m/%Y %H:%M')
             except ValueError:
                 try:
-                    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                    date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
                 except ValueError:
-                    # Try handling Unix timestamp
-                    date_obj = datetime.fromtimestamp(float(date_str))
+                    try:
+                        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                    except ValueError:
+                        # Try handling Unix timestamp
+                        date_obj = datetime.fromtimestamp(float(date_str))
             doc['created_at'] = date_obj.isoformat() + 'Z'
         except Exception as e:
             print(f"Error parsing date {row['created_utc']}: {e}")
