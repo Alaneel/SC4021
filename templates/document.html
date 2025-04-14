@@ -61,7 +61,7 @@
 
             <!-- {% if doc.word_count %}
             <span class="badge bg-secondary">
-                Words: {{ doc.word_count }}
+                Words: {{ doc.word_count[0] }}
             </span>
             {% endif %} -->
         </div>
@@ -163,7 +163,6 @@
                         {% if doc.parent_id %}
                         <tr>
                             <th>Parent ID</th>
-                            <!-- <td>{{ doc.parent_id }}</td> -->
                             <td><a href="/document/{{ doc.parent_id.0[3:] }}">{{ doc.parent_id.0[3:]}}</a></td> 
                         </tr>
                         {% endif %}

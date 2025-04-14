@@ -1,7 +1,7 @@
 <!-- templates/search_results.html -->
 {% extends 'base.html' %}
-
 {% block title %}Search Results{% endblock %}
+
 
 {% block head %}
 {{ super() }}
@@ -313,7 +313,6 @@
                                 {% elif 'negative' in doc.sentiment %}bg-danger
                                 {% else %}bg-secondary
                                 {% endif %}">
-                    
                                 {{ doc.sentiment|replace("['",'')|replace("']",'')|replace('["','')|replace('"]','') }}
                                 </span>
                                 {% endif %}

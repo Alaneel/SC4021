@@ -1,4 +1,4 @@
-# evaluation/manual_annotate.py
+# manual_annotation.py
 """Tool for creating labeled evaluation dataset for sentiment classifier."""
 
 import pandas as pd
@@ -11,13 +11,14 @@ from tqdm import tqdm
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
+
 # GUI for annotation
-class AnnotationTool:
+class ManualAnnotator:
     """GUI tool for manually annotating evaluation dataset."""
 
     def __init__(self, data_path=None):
         """
-        Initialize the annotation tool.
+        Initialize the manual annotator.
 
         Args:
             data_path (str, optional): Path to dataset to annotate
@@ -185,7 +186,7 @@ class AnnotationTool:
         filepath = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-            initialfile=f"annotated_{self.annotator_id}.csv"
+            initialfile=f"evaluation_dataset_{self.annotator_id}.csv"
         )
 
         if filepath:
@@ -306,14 +307,27 @@ class AnnotationTool:
         self.root.mainloop()
 
 
+def manual_annotation_workflow(data_path=None):
+    """
+    Run the manual annotation workflow.
+
+    Args:
+        data_path (str, optional): Path to the dataset to annotate
+
+    Returns:
+        None
+    """
+    # Initialize and run the annotation tool
+    annotator = ManualAnnotator(data_path)
+    annotator.run()
+
+
 # Example usage:
 if __name__ == "__main__":
     # If run directly, launch the annotation tool
     if len(sys.argv) > 1:
         # Use file path from command line
-        tool = AnnotationTool(sys.argv[1])
+        manual_annotation_workflow(sys.argv[1])
     else:
         # Start with empty tool
-        tool = AnnotationTool()
-
-    tool.run()
+        manual_annotation_workflow()

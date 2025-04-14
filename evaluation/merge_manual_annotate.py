@@ -10,20 +10,21 @@ import numpy as np
 from tqdm import tqdm
 from datetime import datetime
 
-class EvaluationDatasetCreator:
-    """Tool for creating and managing evaluation datasets for sentiment classification."""
+
+class AnnotationMerger:
+    """Tool for merging annotations from multiple annotators into a unified dataset."""
 
     def __init__(self, data_path=None, output_path=None, sample_size=1000):
         """
-        Initialize the dataset creator.
+        Initialize the annotation merger.
 
         Args:
             data_path (str): Path to the processed dataset
-            output_path (str): Path to save the evaluation dataset
+            output_path (str): Path to save the merged evaluation dataset
             sample_size (int): Number of records to include in the evaluation dataset
         """
         self.data_path = data_path
-        self.output_path = output_path or 'data/evaluation_dataset.csv'
+        self.output_path = output_path or 'data/evaluation_dataset_merged.csv'
         self.sample_size = sample_size
         self.data = None
         self.evaluation_sample = None
@@ -131,7 +132,7 @@ class EvaluationDatasetCreator:
         if self.evaluation_sample is None:
             self.create_stratified_sample()
 
-        output_path = output_path or f"data/evaluation_sample_{annotator_id or 'default'}.csv"
+        output_path = output_path or f"data/evaluation_dataset_{annotator_id or 'default'}.csv"
 
         # Create output directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -332,9 +333,9 @@ class EvaluationDatasetCreator:
 
         return agreement_metrics
 
-    def save_evaluation_dataset(self, output_path=None):
+    def save_merged_dataset(self, output_path=None):
         """
-        Save the final evaluation dataset.
+        Save the final merged dataset.
 
         Args:
             output_path (str, optional): Path to save the dataset
@@ -352,38 +353,35 @@ class EvaluationDatasetCreator:
 
         # Save dataset
         self.evaluation_sample.to_csv(output_path, index=False)
-        print(f"Saved evaluation dataset to {output_path}")
+        print(f"Saved merged dataset to {output_path}")
         return output_path
 
-def main():
-    """
-    Main function to process and combine annotated datasets.
-    """
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Combine annotated datasets into evaluation dataset')
-    parser.add_argument('--input-dir', type=str, required=True,
-                        help='Directory containing annotated CSV files')
-    parser.add_argument('--output-path', type=str, default='data/final_evaluation_dataset.csv',
-                        help='Path to save the final evaluation dataset')
-    parser.add_argument('--agreement-report', type=str, default='data/annotator_agreement_report.json',
-                        help='Path to save the annotator agreement report')
-    parser.add_argument('--min-agreement', type=float, default=0.7,
-                        help='Minimum agreement threshold for including records')
 
-    args = parser.parse_args()
+def merge_annotations_workflow(input_dir, output_path, agreement_report=None, min_agreement=0.7):
+    """
+    Main workflow function to process and combine annotated datasets.
 
-    # Initialize the dataset creator
-    creator = EvaluationDatasetCreator(output_path=args.output_path)
+    Args:
+        input_dir (str): Directory containing annotated CSV files
+        output_path (str): Path to save the final evaluation dataset
+        agreement_report (str, optional): Path to save the annotator agreement report
+        min_agreement (float): Minimum agreement threshold for including records
+
+    Returns:
+        dict: Results of the merging process
+    """
+    # Initialize the merger
+    merger = AnnotationMerger(output_path=output_path)
 
     # Find all annotated CSV files in the input directory
     annotated_files = []
-    for file in os.listdir(args.input_dir):
-        if file.endswith('.csv') and 'annotated' in file:
-            annotated_files.append(os.path.join(args.input_dir, file))
+    for file in os.listdir(input_dir):
+        if file.endswith('.csv') and 'evaluation_dataset_annotator' in file:
+            annotated_files.append(os.path.join(input_dir, file))
 
     if not annotated_files:
-        print(f"No annotated CSV files found in {args.input_dir}")
-        return
+        print(f"No annotated CSV files found in {input_dir}")
+        return {}
 
     print(f"Found {len(annotated_files)} annotated files")
 
@@ -391,13 +389,13 @@ def main():
     for file_path in annotated_files:
         # Extract annotator ID from filename
         filename = os.path.basename(file_path)
-        annotator_id = filename.replace('annotated_', '').replace('.csv', '')
+        annotator_id = filename.replace('evaluation_dataset_', '').replace('.csv', '')
 
         print(f"Importing annotations from {annotator_id}")
-        creator.import_annotated_sample(file_path, annotator_id)
+        merger.import_annotated_sample(file_path, annotator_id)
 
     # Calculate annotator agreement
-    agreement_metrics = creator.calculate_annotator_agreement()
+    agreement_metrics = merger.calculate_annotator_agreement()
 
     if agreement_metrics:
         # Display agreement metrics
@@ -421,23 +419,23 @@ def main():
                         print(f"  {feature} Correlation: {value:.4f}")
 
         # Save agreement report
-        import json
-        os.makedirs(os.path.dirname(args.agreement_report), exist_ok=True)
-        with open(args.agreement_report, 'w') as f:
-            json.dump(agreement_metrics, f, indent=2)
+        if agreement_report:
+            import json
+            os.makedirs(os.path.dirname(agreement_report), exist_ok=True)
+            with open(agreement_report, 'w') as f:
+                json.dump(agreement_metrics, f, indent=2)
 
-        print(f"\nAgreement report saved to {args.agreement_report}")
+            print(f"\nAgreement report saved to {agreement_report}")
 
     # Merge annotations
     print("\nMerging annotations from all annotators...")
-    merged_dataset = creator.merge_annotations()
+    merged_dataset = merger.merge_annotations()
 
-    # Save the final evaluation dataset
-    output_path = creator.save_evaluation_dataset()
-    print(f"\nFinal evaluation dataset saved to {output_path}")
+    # Save the final merged dataset
+    output_path = merger.save_merged_dataset()
 
     # Print dataset statistics
-    print("\nEvaluation Dataset Statistics:")
+    print("\nMerged Dataset Statistics:")
     print(f"  Total records: {len(merged_dataset)}")
 
     sentiment_counts = merged_dataset['manual_sentiment'].value_counts()
@@ -449,6 +447,32 @@ def main():
     if missing_sentiment > 0:
         print(f"  Warning: {missing_sentiment} records have missing manual sentiment labels")
 
+    return {
+        'total_records': len(merged_dataset),
+        'annotators': len(annotated_files),
+        'sentiment_counts': sentiment_counts.to_dict(),
+        'output_path': output_path
+    }
+
 
 if __name__ == "__main__":
-    main()
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Combine annotated datasets into evaluation dataset')
+    parser.add_argument('--input-dir', type=str, required=True,
+                        help='Directory containing annotated CSV files')
+    parser.add_argument('--output-path', type=str, default='data/evaluation_dataset_merged.csv',
+                        help='Path to save the final evaluation dataset')
+    parser.add_argument('--agreement-report', type=str, default='data/annotator_agreement_report.json',
+                        help='Path to save the annotator agreement report')
+    parser.add_argument('--min-agreement', type=float, default=0.7,
+                        help='Minimum agreement threshold for including records')
+
+    args = parser.parse_args()
+
+    # Run the merge workflow
+    merge_annotations_workflow(
+        args.input_dir,
+        args.output_path,
+        args.agreement_report,
+        args.min_agreement
+    )

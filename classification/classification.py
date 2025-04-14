@@ -23,6 +23,10 @@ import time
 import warnings
 from imblearn.over_sampling import SMOTE
 from collections import defaultdict, Counter
+from textblob import TextBlob
+import spacy
+nlp = spacy.load("en_core_web_sm")
+import torch
 
 # Suppress warnings
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -33,7 +37,132 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
+nltk.download('omw-1.4', quiet=True)
 
+# Sarcasm detection using HuggingFace model
+try:
+    device = 0 if torch.cuda.is_available() else -1
+    sarcasm_detector = pipeline("text-classification", model="bert-base-uncased", device=device)
+except Exception as e:
+    print("Sarcasm model could not be loaded:", e)
+    sarcasm_detector = None
+
+def detect_sarcasm_batch(text_list, batch_size=32):
+    if sarcasm_detector is None or not text_list:
+        return [False] * len(text_list)
+
+    results = []
+    for i in range(0, len(text_list), batch_size):
+        batch = text_list[i:i + batch_size]
+
+        # Truncate long inputs to avoid 512-token limit issues
+        truncated_batch = [text[:1024] if isinstance(text, str) else "" for text in batch]
+
+        try:
+            batch_results = sarcasm_detector(truncated_batch)
+            results.extend([res['label'].lower() == 'sarcasm' for res in batch_results])
+        except Exception as e:
+            print(f"Batch {i // batch_size} failed:", e)
+            results.extend([False] * len(batch))
+    return results
+
+# Word Sense Disambiguation using NLTK's Lesk algorithm
+from nltk.wsd import lesk
+from nltk.tokenize import word_tokenize
+
+def apply_wsd(text):
+    tokens = word_tokenize(text)
+    senses = [lesk(tokens, word) for word in tokens]
+    return " ".join([sense.name() if sense else word for sense, word in zip(senses, tokens)])
+
+# Subjectivity Detection
+from textblob import TextBlob
+
+def is_opinionated(text):
+    blob = TextBlob(text)
+    return blob.sentiment.subjectivity >= 0.4
+
+# Named Entity Recognition (NER)
+import spacy
+nlp = spacy.load("en_core_web_sm")
+
+def extract_named_entities(text):
+    doc = nlp(text)
+    return [ent.text for ent in doc.ents if ent.label_ in ["PERSON", "ORG", "PRODUCT"]]
+
+# Modified preprocess_text to support sarcasm/WSD/subjectivity
+def preprocess_text_advanced(text, use_sarcasm=False, use_wsd=False, use_subjectivity=False):
+    text = preprocess_text(text)
+    if use_subjectivity and not is_opinionated(text):
+        return ""  # Skip non-opinionated
+    if use_wsd:
+        text = apply_wsd(text)
+    return text
+
+# Add stacked ensemble model builder
+from sklearn.ensemble import StackingClassifier
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
+def build_stacked_model():
+    base_learners = [
+        ('nb', MultinomialNB()),
+        ('rf', RandomForestClassifier(n_estimators=50))
+    ]
+    meta_learner = LogisticRegression(max_iter=1000, class_weight='balanced')
+    return StackingClassifier(estimators=base_learners, final_estimator=meta_learner)
+
+# Runner function to test stacked model + sarcasm + WSD + subjectivity + NER
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report
+
+def run_stacked_sarcasm_wsd_pipeline(df):
+    print("\nRunning stacked ensemble model with WSD, Sarcasm detection, and Subjectivity filtering...")
+
+    # Apply initial cleaning
+    cleaned_texts = df['content'].apply(preprocess_text).tolist()
+
+    # Filter opinionated
+    opinion_mask = [is_opinionated(text) for text in cleaned_texts]
+    cleaned_texts = [text for text, keep in zip(cleaned_texts, opinion_mask) if keep]
+    df = df.loc[opinion_mask].copy()
+
+    # Apply WSD
+    print("Applying Word Sense Disambiguation (WSD)...")
+    wsd_texts = [apply_wsd(text) for text in cleaned_texts]
+
+    # Detect sarcasm
+    print("Detecting sarcasm in batches...")
+    sarcasm_flags = detect_sarcasm_batch(wsd_texts)
+    processed_texts = [text + " sarcasm" if is_sarcastic else text for text, is_sarcastic in zip(wsd_texts, sarcasm_flags)]
+
+    df.loc[:, 'processed_content'] = processed_texts
+    df = df[df['processed_content'].str.strip() != ""]
+
+    # Add NER feature
+    print("Extracting named entities...")
+    df.loc[:, 'named_entity_count'] = df['content'].apply(lambda x: len(extract_named_entities(str(x))))
+
+    X = df[['processed_content', 'text_length', 'word_count', 'sentiment_ratio',
+            'positive_word_count', 'negative_word_count', 'named_entity_count']]
+    y = df['sentiment_binary']
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.3, random_state=42, stratify=df['platform'] if 'platform' in df.columns else None
+    )
+
+    vectorizer = TfidfVectorizer(max_features=3000)
+    X_train_vect = vectorizer.fit_transform(X_train['processed_content'])
+    X_test_vect = vectorizer.transform(X_test['processed_content'])
+
+    clf = build_stacked_model()
+    clf.fit(X_train_vect, y_train)
+    y_pred = clf.predict(X_test_vect)
+
+    print("Classification Report (Stacked + WSD + Sarcasm + Subjectivity + NER):")
+    print(classification_report(y_test, y_pred))
 
 # 1. DATA LOADING AND PREPROCESSING
 def load_data(file_path):
@@ -426,13 +555,16 @@ def transformer_sentiment_analysis(df, sample_size=1000, stratify_by_platform=Tr
     model = AutoModelForSequenceClassification.from_pretrained(model_name)
 
     # Create sentiment analysis pipeline with truncation
+    device = 0 if torch.cuda.is_available() else -1
     sentiment_analyzer = pipeline(
         "sentiment-analysis",
         model=model,
         tokenizer=tokenizer,
+        device=device,
         truncation=True,
         max_length=512
     )
+
 
     # Take a stratified sample for analysis
     if len(df) > sample_size:
@@ -1141,6 +1273,9 @@ def main():
         print("\nPlatform distribution in preprocessed data:")
         for platform, count in platform_counts.items():
             print(f"  {platform}: {count} ({count / len(df) * 100:.2f}%)")
+
+    # Run the enhanced classification with stacked ensemble + WSD + sarcasm
+    run_stacked_sarcasm_wsd_pipeline(df)
 
     # 3. Split data for training and testing
     feature_cols = ['processed_content', 'text_length', 'word_count', 'sentiment_ratio',
