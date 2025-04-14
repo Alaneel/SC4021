@@ -1,4 +1,3 @@
-# crawlers.py
 """Social media crawler classes for Reddit and Twitter."""
 
 import praw
@@ -122,140 +121,17 @@ class RedditCrawler:
             json.dump(self.data, f)
         print(f"Saved {len(self.data)} records to {filename}")
 
-
-class TwitterCrawler:
-    """Class for crawling Twitter posts related to streaming services."""
-
-    def __init__(self, consumer_key, consumer_secret, access_token, access_token_secret, bearer_token):
-        """Initialize the Twitter crawler with API credentials."""
-        self.client = tweepy.Client(
-            consumer_key=consumer_key,
-            consumer_secret=consumer_secret,
-            access_token=access_token,
-            access_token_secret=access_token_secret,
-            bearer_token=bearer_token
-        )
-        self.data = []
-
-    def crawl_tweets(self, query, max_results=100, limit=5000):
-        """
-        Crawl tweets matching the query.
-
-        Args:
-            query (str): Search query for tweets
-            max_results (int): Maximum results per API call
-            limit (int): Total maximum number of tweets to retrieve
-        """
-        total_crawled = 0
-        next_token = None
-
-        with tqdm(total=limit, desc=f"Crawling tweets for '{query}'") as pbar:
-            while total_crawled < limit:
-                try:
-                    # API call with pagination
-                    response = self.client.search_recent_tweets(
-                        query=query,
-                        max_results=min(max_results, limit - total_crawled),
-                        next_token=next_token,
-                        tweet_fields=['created_at', 'public_metrics', 'author_id', 'lang']
-                    )
-
-                    if not response.data:
-                        print(f"No more tweets found for query: {query}")
-                        break
-
-                    # Process tweet data
-                    for tweet in response.data:
-                        if tweet.lang != 'en':  # Filter non-English tweets
-                            continue
-
-                        tweet_data = {
-                            'id': tweet.id,
-                            'text': tweet.text,
-                            'created_at': tweet.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                            'author_id': tweet.author_id,
-                            'retweet_count': tweet.public_metrics['retweet_count'],
-                            'reply_count': tweet.public_metrics['reply_count'],
-                            'like_count': tweet.public_metrics['like_count'],
-                            'query': query,
-                            'platform': self._detect_streaming_platform(tweet.text)
-                        }
-                        self.data.append(tweet_data)
-
-                    total_crawled += len(response.data)
-                    pbar.update(len(response.data))
-
-                    # Get next pagination token
-                    if 'next_token' in response.meta:
-                        next_token = response.meta['next_token']
-                    else:
-                        print(f"No more pagination tokens for query: {query}")
-                        break
-
-                    # Rate limit handling
-                    time.sleep(3)  # Respect Twitter API rate limits
-
-                except Exception as e:
-                    print(f"Error crawling tweets: {str(e)}")
-                    time.sleep(60)  # Wait longer if there's an error
-
-        print(f"Crawled {len(self.data)} tweets for query: {query}")
-
-    def _detect_streaming_platform(self, text):
-        """
-        Detect which streaming platform is being discussed in the text.
-
-        Args:
-            text (str): Text to analyze
-
-        Returns:
-            str: Detected platform name or 'general' if none found
-        """
-        text = text.lower()
-        for platform, keywords in STREAMING_PLATFORMS.items():
-            for keyword in keywords:
-                if keyword in text:
-                    return platform
-        return 'general'  # If no specific platform is mentioned
-
-    def save_to_csv(self, filename):
-        """
-        Save crawled data to CSV file.
-
-        Args:
-            filename (str): Path to save the CSV file
-
-        Returns:
-            DataFrame: Pandas DataFrame of the saved data
-        """
-        df = pd.DataFrame(self.data)
-        df.to_csv(filename, index=False)
-        print(f"Saved {len(df)} records to {filename}")
-        return df
-
-    def save_to_json(self, filename):
-        """
-        Save crawled data to JSON file.
-
-        Args:
-            filename (str): Path to save the JSON file
-        """
-        with open(filename, 'w') as f:
-            json.dump(self.data, f)
-        print(f"Saved {len(self.data)} records to {filename}")
-
-
 def combine_datasets(reddit_df, twitter_df=None, output_filename=None):
     """
-    Combine Reddit and optional Twitter data into a single dataset.
+    Process Reddit data into a unified dataset.
 
     Args:
         reddit_df (DataFrame): DataFrame containing Reddit data
-        twitter_df (DataFrame, optional): DataFrame containing Twitter data
+        twitter_df (DataFrame, optional): Parameter kept for backward compatibility
         output_filename (str, optional): Path to save the combined CSV file
 
     Returns:
-        DataFrame: Combined dataset
+        DataFrame: Processed dataset
     """
     combined_data = []
 
@@ -271,23 +147,10 @@ def combine_datasets(reddit_df, twitter_df=None, output_filename=None):
             'score': row['score']
         })
 
-    # Process Twitter data if provided
-    if twitter_df is not None:
-        for _, row in twitter_df.iterrows():
-            combined_data.append({
-                'id': f"twitter_{row['id']}",
-                'text': row['text'],
-                'title': "",
-                'created_at': row['created_at'],
-                'platform': row['platform'],
-                'source': 'twitter',
-                'score': row['like_count']
-            })
-
     # Create and save combined DataFrame
     combined_df = pd.DataFrame(combined_data)
     if output_filename:
         combined_df.to_csv(output_filename, index=False)
-        print(f"Saved combined dataset with {len(combined_df)} records to {output_filename}")
+        print(f"Saved dataset with {len(combined_df)} records to {output_filename}")
 
     return combined_df
