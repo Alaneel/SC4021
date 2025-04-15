@@ -181,7 +181,7 @@
                 
                 <!-- Filters below -->
                 <div class="mt-2">
-                    {% if selected_platform or selected_type or selected_sentiment or selected_feature and selected_feature != 'any' %}
+                    {% if selected_platform or selected_type or selected_sentiment or start_date or end_date or selected_feature and selected_feature != 'any' %}
                     <small class="text-dark">{{ 'Filters:' }}</small>
                         {% if selected_platform %}
                         <span class="badge bg-info me-1">Platform: {{ selected_platform }}</span>
@@ -202,6 +202,14 @@
             
                         {% if selected_feature and selected_feature != 'any' %}
                         <span class="badge bg-primary me-1">Feature: {{ selected_feature }}</span>
+                        {% endif %}
+
+                        {% if start_date %}
+                        <span class="badge bg-secondary me-1">Start Date: {{ start_date }}</span>
+                        {% endif %}
+
+                        {% if end_date %}
+                        <span class="badge bg-secondary me-1">End Date: {{ end_date }}</span>
                         {% endif %}
                     {% endif %}
                 </div>
