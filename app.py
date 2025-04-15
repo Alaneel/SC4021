@@ -7,11 +7,14 @@ import plotly.express as px
 import logging
 import sys
 from datetime import datetime, timedelta
+import pysolr
 
 app = Flask(__name__)
 
 # Solr connection settings
 SOLR_URL = "http://localhost:8983/solr/streaming_opinions"
+
+solr = pysolr.Solr('http://localhost:8983/solr/streaming_opinions')
 
 # Configure logging
 logging.basicConfig(
@@ -170,6 +173,14 @@ def search():
         'sort': sort,
         'fl': 'id,text,cleaned_text,full_text,cleaned_full_text,title,platform,source,created_at,score,type,author,subreddit,permalink,parent_id,num_comments,word_count,sentiment,sentiment_score,subjectivity_score,content_quality,pricing,ui_ux,technical,customer_service',
         'wt': 'json',
+        # Add spellcheck parameters
+        'spellcheck': 'on',
+        'spellcheck.dictionary': 'default',
+        'spellcheck.count': 5,
+        'spellcheck.collate': 'true',
+        'spellcheck.maxCollations': 3,
+        'spellcheck.maxCollationTries': 5,
+        'spellcheck.collateExtendedResults': 'true'
     }
 
     try:
@@ -180,6 +191,38 @@ def search():
         response.raise_for_status()
         results = response.json()
 
+        # Extract spellcheck suggestions if available
+        spellcheck_suggestions = {}
+        collation = None
+        if 'spellcheck' in results and results['spellcheck']:
+            print("\n--- Spellcheck Debug Information ---")
+            spellcheck_data = results['spellcheck']
+            
+            # Extract word-specific suggestions
+            if 'suggestions' in spellcheck_data and spellcheck_data['suggestions']:
+                suggestions = spellcheck_data['suggestions']
+                for i in range(0, len(suggestions), 2):
+                    if i+1 < len(suggestions):
+                        word = suggestions[i]
+                        suggestion_info = suggestions[i+1]
+                        if 'suggestion' in suggestion_info:
+                            spellcheck_suggestions[word] = suggestion_info['suggestion']
+                            print(f"  '{word}' → {suggestion_info['suggestion']}")
+            
+            # Get collated (corrected) query
+            if 'collations' in spellcheck_data and spellcheck_data['collations']:
+                collations = spellcheck_data['collations']
+                if len(collations) > 1 and collations[0] == 'collation':
+                    for i in range(1, len(collations), 2):
+                        if i+1 < len(collations) and isinstance(collations[i+1], dict) and 'collationQuery' in collations[i+1]:
+                            collation = collations[i+1]['collationQuery']
+                            # Clean up the collation query if needed
+                            if collation.startswith('text:"') and ' OR title:"' in collation:
+                                # Extract just the corrected search term
+                                collation = collation.split('text:"')[1].split('"')[0]
+                            break
+        else:
+            print("no spellcheck")
         # Format created_at nicely for each doc
         for doc in results['response']['docs']:
             print_document_features(doc)
@@ -250,12 +293,44 @@ def search():
             start_date=start_date,
             end_date=end_date,
             visualizations=visualizations,
-            sort=sort
+            sort=sort,
+            # Add spellcheck info to template context
+            spellcheck_suggestions=spellcheck_suggestions,
+            collation=collation
         )
     except Exception as e:
         error_message = f"Error searching Solr: {str(e)}"
         print(error_message)
         return render_template('error.html', message=error_message), 500
+
+@app.route('/api/suggest', methods=['GET'])
+def suggest():
+    query = request.args.get('query', '')
+    if not query or len(query) < 2:
+        print("No suggestions")
+        return jsonify([])
+    
+    # Query Solr's suggest handler
+    params = {
+        'suggest': 'true',
+        'suggest.build': 'false',
+        'suggest.dictionary': 'keywordSuggester',
+        'suggest.q': query,
+        'wt': 'json'
+    }
+    
+    response = solr.get('suggest', params=params)
+    
+    # Parse suggestion results
+    suggestions = []
+    if 'suggest' in response:
+        print("successful suggest")
+        suggest_data = response['suggest']['keywordSuggester'][query]
+        if 'suggestions' in suggest_data:
+            for suggestion in suggest_data['suggestions']:
+                suggestions.append(suggestion['term'])
+    
+    return jsonify(suggestions)
 
 
 @app.route('/document/<doc_id>')
