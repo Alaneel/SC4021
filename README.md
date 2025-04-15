@@ -80,7 +80,8 @@ Replace the placeholder values with your actual Reddit API credentials.
    ```bash
    cp solr_files/schema.xml [solr_installation_path]/server/solr/streaming_opinions/conf/
    ```
-5. Restart Solr:
+5. Replace the original solrconfig file with solr_files/solrconfig.xml
+6. Restart Solr:
    ```bash
    bin/solr restart  # On Windows: bin\solr.cmd restart
    ```
