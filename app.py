@@ -341,11 +341,38 @@ def view_document(doc_id):
         'fl': '*',  # Request all fields
         'wt': 'json'
     }
+    mlt_params = {
+        'q': f'id:"{doc_id}"',
+        'mlt': 'true',
+        'mlt.fl': 'text,cleaned_text',  # Choose fields used for similarity
+        'mlt.mindf': 1,
+        'mlt.mintf': 1,
+        'mlt.count': 10,
+        'wt': 'json'
+    }
 
     try:
         response = requests.get(f"{SOLR_URL}/select", params=params)
         response.raise_for_status()
         results = response.json()
+
+        mlt_response = requests.get(f"{SOLR_URL}/select", params=mlt_params)
+        mlt_response.raise_for_status()
+        mlt_results = mlt_response.json()
+        
+        if mlt_results:
+            mlt = mlt_results['moreLikeThis'][doc_id]['docs']
+            similar_docs = []
+            for mlt_doc in mlt:
+                print(datetime.strptime(mlt_doc['created_at'][0], '%Y-%m-%dT%H:%M:%SZ').strftime("%d %m %Y"))
+
+                similar_docs.append({
+                    "id": mlt_doc['id'],
+                    "text": mlt_doc['text'],
+                    "created_at": datetime.strptime(mlt_doc['created_at'][0], '%Y-%m-%dT%H:%M:%SZ').strftime('%B %d, %Y'),
+                    "author": mlt_doc['author'],
+                })
+
 
         if results['response']['numFound'] > 0:
             doc = results['response']['docs'][0]
@@ -445,7 +472,7 @@ def view_document(doc_id):
                     except:
                         entities = []
 
-            return render_template('document.html', doc=doc, related_docs=related_docs,
+            return render_template('document.html', doc=doc, related_docs=related_docs, similar_docs=similar_docs,
                                 keywords=keywords, entities=entities)
         else:
             return render_template('error.html', message="Document not found"), 404

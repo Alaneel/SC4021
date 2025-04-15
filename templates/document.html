@@ -313,6 +313,40 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- More Like This -->
+        <div class="mt-4">
+            <h5>🔍 More Like This</h5>
+        
+            {% if similar_docs %}
+            <div class="card-body p-0">
+                <!-- Scrollable container -->
+                <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    {% for item in similar_docs %}
+                        <a href="/document/{{ item.id }}" class="list-group-item p-3 text-decoration-none text-dark">
+                            {% if item.title %}
+                                <p class="fw-light fst-italic">{{ item.title[0] }}</p>
+                            {% else %}
+                                <p class="fw-light fst-italic">{{ item.text[0] }}</p>
+                            {% endif %}
+                            
+                            {% if item.created_at %}
+                                <small class="text-muted ms-2">{{ item.created_at }}</small>
+                            {% endif %}
+                            
+                            {% if item.author %}
+                                <small class="text-muted ms-2">by: {{ item.author|join(', ') }}</small>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p>No similar documents found.</p>
+            {% endif %}
+        </div>
+        
+
     </div>
     <div class="card-footer">
         <a href="javascript:history.back()" class="btn btn-secondary">Back to Results</a>
