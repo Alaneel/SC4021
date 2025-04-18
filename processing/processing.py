@@ -4,6 +4,7 @@ import re
 import nltk
 import json
 import hashlib
+import torch
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
@@ -13,7 +14,7 @@ from nltk.chunk import ne_chunk
 from langdetect import detect
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from huggingface_hub import InferenceClient
+from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
 from gensim.models.phrases import Phrases, Phraser
 from tqdm import tqdm
 
@@ -51,6 +52,22 @@ class EnhancedDataProcessor:
         self.stop_words = set(stopwords.words('english'))
         self.lemmatizer = WordNetLemmatizer()
         self.sentiment_analyzer = SentimentIntensityAnalyzer()
+        
+        # Setting up Hugging Face model pipeline
+        self.hf_model_name = "finiteautomata/bertweet-base-sentiment-analysis"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hf_model_name)
+        self.hf_model = AutoModelForSequenceClassification.from_pretrained(self.hf_model_name)
+        # Setup GPU for running HF model
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        if self.device == "cuda":
+            self.hf_model.to(torch.device("cuda"))
+        self.pipeline = pipeline(
+            "sentiment-analysis",
+            model=self.hf_model,
+            tokenizer=self.tokenizer,
+            device=0 if self.device == "cuda" else -1,
+            batch_size=32
+        )
 
         # Set processing parameters
         self.min_text_length = min_text_length
@@ -264,31 +281,27 @@ class EnhancedDataProcessor:
 
         return sentiment, compound_score
     
-    # def analyze_sentiment_hugging_face(self, text):
-    #     """
-    #     This function sends the text to a hugging face model for sentiment analysis
-    #     It takes in the text to analyze and returns a tuple which contains the sentiment category and confidence score
-    #     """
-    #     if not text:
-    #         return 'neutral', 0.0
+    def analyze_batch_hf(self, text):
+        # This function processes batches of the text data and returns results
+        try:
+            return self.pipeline(text, truncation=True)
+        except Exception as e:
+            print(f"Error processing batch: {str(e)}")
+            return [{'label': 'ERROR', 'score': 0.0} for _ in text]
+    
+    def analyze_sentiment_hugging_face(self, text):
+        """
+        This function takes in the text to analyze, batches the text and passes it to analyze_batch_hf for analysis
+        Returns a list of results 
+        """
+        texts = text.to_list()
+        results = []
+        for i in tqdm(range(0, len(texts), 32), desc='Processing batches'):
+            batch = texts[i:i+32]
+            batch_results = self.analyze_batch_hf(batch)
+            results.extend(batch_results)
         
-    #     try:
-    #         # Send the document to the Hugging Face model for sentiment analysis
-    #         response = self.client.text_classification(text, model=self.hf_model_name)
-
-    #         # The model should return a response in the form of a list containing the label and confidence score
-    #         if response and isinstance(response, list):
-    #             # Extract the label and score from the first prediction
-    #             top_prediction = response[0]
-    #             label = top_prediction['label'].lower()  # Normalize label to lowercase
-    #             score = top_prediction['score']
-    #             return label, score
-    #         else:
-    #             raise ValueError("Unexpected response format from Hugging Face API.")
-    #     except Exception as e:
-    #         # Handle errors gracefully and log them
-    #         print(f"Error analyzing sentiment for document: {e}")
-    #         return 'unknown', 0.0
+        return results
 
     def extract_features(self, text):
         """
@@ -463,11 +476,18 @@ class EnhancedDataProcessor:
         df['sentiment'] = sentiment_results.apply(lambda x: x[0])
         df['sentiment_score'] = sentiment_results.apply(lambda x: x[1])
 
-        # # Analyze sentiment using Hugging Face model
-        # print("Analyzing sentiment using Hugging Face model...")
-        # sentiment_results_hf = df[text_column].apply(self.analyze_sentiment_hugging_face)
-        # df['sentiment_hf'] = sentiment_results_hf.apply(lambda x: x[0])
-        # df['sentiment_score_hf'] = sentiment_results_hf.apply(lambda x: x[1])
+        # Analyze sentiment using Hugging Face model
+        print(f"Analyzing sentiment using Hugging Face model using {self.device}...")
+        sentiment_results_hf = self.analyze_sentiment_hugging_face(df[text_column])
+        # Add results to dataframe
+        labels_hf = [result.get('label', 'ERROR') for result in sentiment_results_hf]
+        score_hf = [result.get('score', 0.0) for result in sentiment_results_hf]
+        
+        label_mapping = {'NEG': 'negative', 'NEU': 'neutral', 'POS': 'positive'}
+        mapped_sentiments = [label_mapping.get(label, 'unknown') for label in labels_hf]
+        
+        df['sentiment_hf'] = mapped_sentiments
+        # df['sentiment_score_hf'] = score_hf
 
         # Extract feature scores
         print("Extracting feature scores...")
