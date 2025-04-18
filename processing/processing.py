@@ -27,28 +27,15 @@ nltk.download('averaged_perceptron_tagger', quiet=True)
 nltk.download('maxent_ne_chunker', quiet=True)
 nltk.download('words', quiet=True)
 
-
 class EnhancedDataProcessor:
-    """
-    Enhanced data processor for streaming opinions with comprehensive text analysis capabilities
-    including sentiment analysis, feature extraction, entity recognition, and language detection.
-    """
 
     def __init__(self,
                  streaming_platforms=None,
                  feature_lexicons=None,
                  min_text_length=5,
                  duplicate_threshold=0.8):
-        """
-        Initialize the enhanced data processor.
 
-        Args:
-            streaming_platforms (dict): Dictionary of streaming platforms and their keywords
-            feature_lexicons (dict): Dictionary of feature categories and their keywords
-            min_text_length (int): Minimum word count for text to be processed
-            duplicate_threshold (float): Threshold for considering documents as duplicates
-        """
-        # Core NLP components
+        # Initialize core NLP components
         self.stop_words = set(stopwords.words('english'))
         self.lemmatizer = WordNetLemmatizer()
         self.sentiment_analyzer = SentimentIntensityAnalyzer()
@@ -57,7 +44,8 @@ class EnhancedDataProcessor:
         self.hf_model_name = "finiteautomata/bertweet-base-sentiment-analysis"
         self.tokenizer = AutoTokenizer.from_pretrained(self.hf_model_name)
         self.hf_model = AutoModelForSequenceClassification.from_pretrained(self.hf_model_name)
-        # Setup GPU for running HF model
+
+        # Setup GPU for running Hugging Face model
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if self.device == "cuda":
             self.hf_model.to(torch.device("cuda"))
@@ -114,65 +102,18 @@ class EnhancedDataProcessor:
             ]
         }
 
+        # List of common Reddit bots
         self.bot_list = ['RemindMeBot', 'AutoModerator']
 
     def load_data(self, filepath):
-        """
-        Load data from CSV file.
-
-        Args:
-            filepath (str): Path to the CSV file
-
-        Returns:
-            pd.DataFrame: Loaded dataframe
-        """
+        # Loads dataset into program
         df = pd.read_csv(filepath)
         print(f"Loaded {len(df)} records from {filepath}")
         return df
 
-    # def clean_text(self, text):
-    #     """
-    #     Clean and normalize text.
-
-    #     Args:
-    #         text (str): Text to clean
-
-    #     Returns:
-    #         str: Cleaned text
-    #     """
-    #     if pd.isna(text) or not isinstance(text, str):
-    #         return ""
-
-    #     # Convert to lowercase
-    #     text = text.lower()
-
-    #     # Remove URLs
-    #     text = re.sub(r'http\S+', '', text)
-
-    #     # Replacing multi spaces/new lines to one space
-    #     text = re.sub(r'\s+', ' ', text).strip()
-
-    #     # Remove special characters and numbers
-    #     text = re.sub(r'[^\w\s]', '', text)
-    #     text = re.sub(r'\d+', '', text)
-
-    #     # Tokenize and remove stopwords
-    #     tokens = word_tokenize(text)
-    #     tokens = [self.lemmatizer.lemmatize(word) for word in tokens if word not in self.stop_words]
-
-    #     # Join tokens back to text
-    #     cleaned_text = ' '.join(tokens)
-    #     return cleaned_text
     def clean_text(self, text):
-        """
-        Clean and normalize text while preserving meaning.
+        # This function normalizes the data, remove unwanted characters and lemmatizes words to their base form
 
-        Args:
-            text (str): Text to clean
-
-        Returns:
-            str: Cleaned text
-        """
         if pd.isna(text) or not isinstance(text, str):
             return ""
 
@@ -198,7 +139,7 @@ class EnhancedDataProcessor:
         # Tokenize the text
         tokens = word_tokenize(text)
 
-        # Filter stopwords 
+        # Filter stopwords from tokenized text
         stop_words = set(stopwords.words('english'))
         custom_stop_words = stop_words -  {"not", "no", "if", "and", "but", "does", "did", "of", "out"}
         tokens = [word for word in tokens if word not in custom_stop_words]
@@ -218,15 +159,7 @@ class EnhancedDataProcessor:
 
 
     def detect_language(self, text):
-        """
-        Detect the language of the text.
-
-        Args:
-            text (str): Text to detect language for
-
-        Returns:
-            str: ISO language code or 'unknown'
-        """
+        # Detects the language of the text
         if not text or len(text) < 20:
             return 'unknown'
 
@@ -236,15 +169,7 @@ class EnhancedDataProcessor:
             return 'unknown'
 
     def detect_streaming_platform(self, text):
-        """
-        Detect which streaming platform is being discussed in the text.
-
-        Args:
-            text (str): Text to analyze
-
-        Returns:
-            str: Detected platform name or 'general' if none found
-        """
+        # Detects which streaming platform is being discussed in the text.
         if not text:
             return 'general'
 
@@ -256,15 +181,7 @@ class EnhancedDataProcessor:
         return 'general'
 
     def analyze_sentiment(self, text):
-        """
-        Analyze sentiment of the text.
-
-        Args:
-            text (str): Text to analyze
-
-        Returns:
-            tuple: (sentiment category, sentiment score)
-        """
+        # Analyzes the sentiment of the text by using VADER
         if not text:
             return 'neutral', 0.0
 
@@ -282,7 +199,7 @@ class EnhancedDataProcessor:
         return sentiment, compound_score
     
     def analyze_batch_hf(self, text):
-        # This function processes batches of the text data and returns results
+        # This function passes batches of the text data to HF model and returns results
         try:
             return self.pipeline(text, truncation=True)
         except Exception as e:
@@ -304,15 +221,7 @@ class EnhancedDataProcessor:
         return results
 
     def extract_features(self, text):
-        """
-        Extract scores for different features (content quality, pricing, etc.).
-
-        Args:
-            text (str): Text to analyze
-
-        Returns:
-            dict: Feature scores
-        """
+        # Extract scores for each of the 5 features we have identified
         if not text:
             return {feature: 0.0 for feature in self.feature_lexicons}
 
@@ -339,15 +248,7 @@ class EnhancedDataProcessor:
         return feature_scores
 
     def extract_entities(self, text):
-        """
-        Extract named entities from text.
-
-        Args:
-            text (str): Text to analyze
-
-        Returns:
-            list: List of entities
-        """
+        # Extract named entities from the text
         if not text or len(text) < 20:
             return []
 
@@ -374,16 +275,7 @@ class EnhancedDataProcessor:
             return []
 
     def extract_keywords(self, text, top_n=10):
-        """
-        Extract important keywords from text using TF-IDF.
-
-        Args:
-            text (str): Text to analyze
-            top_n (int): Number of top keywords to extract
-
-        Returns:
-            list: List of keywords
-        """
+        # Extract important keywords from text using TF-IDF.
         if not text or len(text) < 20:
             return []
 
@@ -414,15 +306,7 @@ class EnhancedDataProcessor:
             return []
 
     def preprocess_data(self, df):
-        """
-        Comprehensive preprocessing of the dataset.
-
-        Args:
-            df (pd.DataFrame): DataFrame to preprocess
-
-        Returns:
-            pd.DataFrame: Processed DataFrame
-        """
+        # Comprehensive preprocessing of the dataset.
         print("Starting comprehensive preprocessing...")
 
         # Create a unique ID column if not exists
@@ -506,17 +390,7 @@ class EnhancedDataProcessor:
         return df
 
     def detect_duplicates(self, df, text_column='cleaned_text', threshold=None):
-        """
-        Detect near-duplicate content using TF-IDF and cosine similarity.
-
-        Args:
-            df (pd.DataFrame): DataFrame to check for duplicates
-            text_column (str): Column containing cleaned text
-            threshold (float): Similarity threshold for considering documents as duplicates
-
-        Returns:
-            pd.DataFrame: DataFrame with duplicates removed
-        """
+        # Detect near-duplicate content using TF-IDF and cosine similarity.
         threshold = threshold or self.duplicate_threshold
         print(f"Detecting near-duplicate content with threshold {threshold}...")
 
@@ -565,17 +439,7 @@ class EnhancedDataProcessor:
         return df_no_duplicates
 
     def balance_sentiment(self, df, sentiment_column='sentiment', target_ratio=0.5):
-        """
-        Balance the dataset by sentiment.
-
-        Args:
-            df (pd.DataFrame): DataFrame to balance
-            sentiment_column (str): Column containing sentiment labels
-            target_ratio (float): Target ratio for positive:negative samples
-
-        Returns:
-            pd.DataFrame: Balanced DataFrame
-        """
+        # Balance the dataset by sentiment.
         sentiment_counts = df[sentiment_column].value_counts()
         print(f"Initial sentiment distribution: {sentiment_counts}")
 
@@ -620,16 +484,7 @@ class EnhancedDataProcessor:
         return balanced_df
 
     def generate_corpus_statistics(self, df, text_column='cleaned_text'):
-        """
-        Generate comprehensive statistics about the corpus.
-
-        Args:
-            df (pd.DataFrame): DataFrame to analyze
-            text_column (str): Column containing cleaned text
-
-        Returns:
-            dict: Corpus statistics
-        """
+        # Generate comprehensive statistics about the corpus.
         print("Generating corpus statistics...")
 
         # Count total number of records
@@ -686,28 +541,12 @@ class EnhancedDataProcessor:
         return statistics
 
     def save_processed_data(self, df, output_filepath):
-        """
-        Save processed data to CSV.
-
-        Args:
-            df (pd.DataFrame): Processed DataFrame
-            output_filepath (str): Path to save the CSV file
-        """
+        # Save processed dataframe into csv file
         df.to_csv(output_filepath, index=False)
         print(f"Saved processed data with {len(df)} records to {output_filepath}")
 
     def process_pipeline(self, input_filepath, output_filepath, balance_data=True):
-        """
-        Run the complete processing pipeline.
-
-        Args:
-            input_filepath (str): Path to input CSV file
-            output_filepath (str): Path to save processed CSV file
-            balance_data (bool): Whether to balance the dataset by sentiment
-
-        Returns:
-            tuple: (processed_df, statistics)
-        """
+        # Run the entire processing pipeline
         print(f"Starting processing pipeline for {input_filepath}")
 
         # Load raw data
