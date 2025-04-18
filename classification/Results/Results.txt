@@ -1,0 +1,547 @@
+
+Dataset Information:
+Total records: 108995
+Positive sentiment: 49922 (45.80%)
+Negative sentiment: 59073 (54.20%)
+
+Platform distribution in preprocessed data:
+  general: 90143 (82.70%)
+  netflix: 9705 (8.90%)
+  hulu: 3214 (2.95%)
+  hbo max: 2233 (2.05%)
+  peacock: 1414 (1.30%)
+  disney+: 1262 (1.16%)
+  paramount+: 601 (0.55%)
+  amazon prime: 349 (0.32%)
+  apple tv+: 74 (0.07%)
+
+Sentiment Classification with LR:
+Overall Metrics:
+Accuracy: 0.8283
+Precision: 0.8148
+Recall: 0.8058
+F1 Score: 0.8102
+
+Confusion Matrix:
+[[15100  2725]
+ [ 2889 11985]]
+Including 19 platform-related features in the model
+
+Sentiment Classification with LR:
+Overall Metrics:
+Accuracy: 0.8288
+Precision: 0.8148
+Recall: 0.8070
+F1 Score: 0.8109
+
+Confusion Matrix:
+[[15097  2728]
+ [ 2870 12004]]
+Including 19 platform-related features in the model
+
+Sentiment Classification with RF:
+Overall Metrics:
+Accuracy: 0.7990
+Precision: 0.7532
+Recall: 0.8301
+F1 Score: 0.7898
+
+Confusion Matrix:
+[[13780  4045]
+ [ 2527 12347]]
+Including 19 platform-related features in the model
+
+Sentiment Classification with RF:
+Overall Metrics:
+Accuracy: 0.7988
+Precision: 0.7529
+Recall: 0.8303
+F1 Score: 0.7897
+
+Platform-Specific Metrics:
+
+  HBO MAX (n=670):
+  Accuracy: 0.7716
+  Precision: 0.7067
+  Recall: 0.8197
+  F1 Score: 0.7591
+
+  GENERAL (n=27043):
+  Accuracy: 0.8052
+  Precision: 0.7572
+  Recall: 0.8322
+  F1 Score: 0.7930
+
+  HULU (n=964):
+  Accuracy: 0.7936
+  Precision: 0.7511
+  Recall: 0.8146
+  F1 Score: 0.7816
+
+  DISNEY+ (n=379):
+  Accuracy: 0.8206
+  Precision: 0.7966
+  Recall: 0.8150
+  F1 Score: 0.8057
+
+  NETFLIX (n=2912):
+  Accuracy: 0.7572
+  Precision: 0.7396
+  Recall: 0.8169
+  F1 Score: 0.7763
+
+  PEACOCK (n=424):
+  Accuracy: 0.7594
+  Precision: 0.7032
+  Recall: 0.8063
+  F1 Score: 0.7512
+
+  PARAMOUNT+ (n=180):
+  Accuracy: 0.8056
+  Precision: 0.7500
+  Recall: 0.8000
+  F1 Score: 0.7742
+
+  AMAZON PRIME (n=105):
+  Accuracy: 0.7810
+  Precision: 0.7927
+  Recall: 0.9155
+  F1 Score: 0.8497
+
+Confusion Matrix:
+[[13771  4054]
+ [ 2524 12350]]
+Including 19 platform-related features in the model
+
+Content_quality Classification with RF:
+Overall Metrics:
+Accuracy: 0.9709
+Precision: 0.9075
+Recall: 0.9166
+F1 Score: 0.9120
+
+Confusion Matrix:
+[[26815   503]
+ [  449  4932]]
+Including 19 platform-related features in the model
+Including 19 platform-related features in the model
+
+Pricing Classification with RF:
+Overall Metrics:
+Accuracy: 0.5284
+Precision: 0.5380
+Recall: 0.5748
+F1 Score: 0.5558
+
+Confusion Matrix:
+[[7633 8285]
+ [7135 9646]]
+Including 19 platform-related features in the model
+
+Ui_ux Classification with RF:
+Overall Metrics:
+Accuracy: 0.5059
+Precision: 0.5107
+Recall: 0.5090
+F1 Score: 0.5098
+
+Confusion Matrix:
+[[8138 8051]
+ [8107 8403]]
+Including 19 platform-related features in the model
+
+Technical Classification with RF:
+Overall Metrics:
+Accuracy: 0.5073
+Precision: 0.5088
+Recall: 0.4978
+F1 Score: 0.5033
+
+Confusion Matrix:
+[[8427 7879]
+ [8232 8161]]
+Including 19 platform-related features in the model
+
+Customer_service Classification with RF:
+Overall Metrics:
+Accuracy: 0.5196
+Precision: 0.5270
+Recall: 0.5482
+F1 Score: 0.5374
+
+Confusion Matrix:
+[[7865 8189]
+ [7521 9124]]
+
+Performing transformer-based sentiment analysis...
+Transformer model metrics:
+Accuracy: 0.5310
+Precision: 0.0000
+Recall: 0.0000
+F1 Score: 0.0000
+Processing time for 1000 samples: 21.93 seconds
+Processing speed: 45.61 samples/second
+
+Transformer model metrics by platform:
+
+  NETFLIX (n=89):
+  Accuracy: 0.4157
+  Precision: 0.0000
+  Recall: 0.0000
+  F1 Score: 0.0000
+
+  GENERAL (n=831):
+  Accuracy: 0.5307
+  Precision: 0.0000
+  Recall: 0.0000
+  F1 Score: 0.0000
+
+Confusion Matrix:
+[[531   0]
+Setting truncation for the sentiment analyzer in ABSA
+Aspect-Based Sentiment Analysis Results:
+
+Content_quality:
+  Mentioned in 180 samples
+  Positive: 0 (0.00%)
+  Negative: 180 (100.00%)
+  Agreement with manual annotations: 58.89%
+
+Pricing:
+  Mentioned in 120 samples
+  Positive: 0 (0.00%)
+  Negative: 120 (100.00%)
+  Agreement with manual annotations: 40.00%
+
+Ui_ux:
+  Mentioned in 195 samples
+  Positive: 0 (0.00%)
+  Negative: 195 (100.00%)
+  Agreement with manual annotations: 48.72%
+
+Technical:
+  Mentioned in 113 samples
+  Positive: 0 (0.00%)
+  Negative: 113 (100.00%)
+  Agreement with manual annotations: 44.25%
+
+Customer_service:
+  Mentioned in 131 samples
+  Positive: 0 (0.00%)
+  Negative: 131 (100.00%)
+  Agreement with manual annotations: 35.88%
+
+
+Platform-Specific Aspect Sentiment Analysis:
+
+NETFLIX:
+  Content_quality:
+    Mentioned in 19 samples
+    Positive: 0 (0.00%)
+    Negative: 19 (100.00%)
+  Pricing:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Ui_ux:
+    Mentioned in 17 samples
+    Positive: 0 (0.00%)
+    Negative: 17 (100.00%)
+  Technical:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Customer_service:
+    Mentioned in 14 samples
+    Positive: 0 (0.00%)
+    Negative: 14 (100.00%)
+
+GENERAL:
+  Content_quality:
+    Mentioned in 87 samples
+    Positive: 0 (0.00%)
+    Negative: 87 (100.00%)
+  Pricing:
+    Mentioned in 55 samples
+    Positive: 0 (0.00%)
+    Negative: 55 (100.00%)
+  Ui_ux:
+    Mentioned in 94 samples
+    Positive: 0 (0.00%)
+    Negative: 94 (100.00%)
+  Technical:
+    Mentioned in 39 samples
+    Positive: 0 (0.00%)
+    Negative: 39 (100.00%)
+  Customer_service:
+    Mentioned in 46 samples
+    Positive: 0 (0.00%)
+    Negative: 46 (100.00%)
+
+HBO MAX:
+  Content_quality:
+    Mentioned in 9 samples
+    Positive: 0 (0.00%)
+    Negative: 9 (100.00%)
+  Pricing:
+    Mentioned in 5 samples
+    Positive: 0 (0.00%)
+    Negative: 5 (100.00%)
+  Ui_ux:
+    Mentioned in 9 samples
+    Positive: 0 (0.00%)
+    Negative: 9 (100.00%)
+  Technical:
+    Mentioned in 7 samples
+    Positive: 0 (0.00%)
+    Negative: 7 (100.00%)
+  Customer_service:
+    Mentioned in 8 samples
+    Positive: 0 (0.00%)
+    Negative: 8 (100.00%)
+
+HULU:
+  Content_quality:
+    Mentioned in 7 samples
+    Positive: 0 (0.00%)
+    Negative: 7 (100.00%)
+  Pricing:
+    Mentioned in 7 samples
+    Positive: 0 (0.00%)
+    Negative: 7 (100.00%)
+  Ui_ux:
+    Mentioned in 8 samples
+    Positive: 0 (0.00%)
+    Negative: 8 (100.00%)
+  Technical:
+    Mentioned in 7 samples
+    Positive: 0 (0.00%)
+    Negative: 7 (100.00%)
+  Customer_service:
+    Mentioned in 9 samples
+    Positive: 0 (0.00%)
+    Negative: 9 (100.00%)
+
+AMAZON PRIME:
+  Content_quality:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Pricing:
+    Mentioned in 9 samples
+    Positive: 0 (0.00%)
+    Negative: 9 (100.00%)
+  Ui_ux:
+    Mentioned in 12 samples
+    Positive: 0 (0.00%)
+    Negative: 12 (100.00%)
+  Technical:
+    Mentioned in 12 samples
+    Positive: 0 (0.00%)
+    Negative: 12 (100.00%)
+  Customer_service:
+    Mentioned in 14 samples
+    Positive: 0 (0.00%)
+    Negative: 14 (100.00%)
+
+PEACOCK:
+  Content_quality:
+    Mentioned in 5 samples
+    Positive: 0 (0.00%)
+    Negative: 5 (100.00%)
+  Pricing:
+    Mentioned in 10 samples
+    Positive: 0 (0.00%)
+    Negative: 10 (100.00%)
+  Ui_ux:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Technical:
+    Mentioned in 9 samples
+    Positive: 0 (0.00%)
+    Negative: 9 (100.00%)
+  Customer_service:
+    Mentioned in 9 samples
+    Positive: 0 (0.00%)
+    Negative: 9 (100.00%)
+
+DISNEY+:
+  Content_quality:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Pricing:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Technical:
+    Mentioned in 8 samples
+    Positive: 0 (0.00%)
+    Negative: 8 (100.00%)
+  Customer_service:
+    Mentioned in 10 samples
+    Positive: 0 (0.00%)
+    Negative: 10 (100.00%)
+
+PARAMOUNT+:
+  Content_quality:
+    Mentioned in 10 samples
+    Positive: 0 (0.00%)
+    Negative: 10 (100.00%)
+  Pricing:
+    Mentioned in 8 samples
+    Positive: 0 (0.00%)
+    Negative: 8 (100.00%)
+  Ui_ux:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Technical:
+    Mentioned in 11 samples
+    Positive: 0 (0.00%)
+    Negative: 11 (100.00%)
+  Customer_service:
+    Mentioned in 13 samples
+    Positive: 0 (0.00%)
+    Negative: 13 (100.00%)
+
+APPLE TV+:
+  Content_quality:
+    Mentioned in 21 samples
+    Positive: 0 (0.00%)
+    Negative: 21 (100.00%)
+  Ui_ux:
+    Mentioned in 30 samples
+    Positive: 0 (0.00%)
+    Negative: 30 (100.00%)
+  Technical:
+    Mentioned in 9 samples
+    Positive: 0 (0.00%)
+    Negative: 9 (100.00%)
+  Customer_service:
+    Mentioned in 8 samples
+    Positive: 0 (0.00%)
+    Negative: 8 (100.00%)
+
+Performing cross-platform sentiment comparison...
+
+Platform Comparison - Overall Positive Sentiment:
+  netflix: 50.43% positive (n=9705)
+  general: 45.34% positive (n=90143)
+  hbo max: 45.86% positive (n=2233)
+  hulu: 42.63% positive (n=3214)
+  amazon prime: 66.76% positive (n=349)
+  peacock: 46.11% positive (n=1414)
+  disney+: 46.67% positive (n=1262)
+  paramount+: 40.27% positive (n=601)
+  apple tv+: 59.46% positive (n=74)
+
+Platform Comparison by Aspect (Positive %):
+
+  Content_quality:
+    netflix: 34.67%
+    general: 13.26%
+    hbo max: 28.53%
+    hulu: 22.00%
+    amazon prime: 30.95%
+    peacock: 34.09%
+    disney+: 26.07%
+    paramount+: 36.77%
+    apple tv+: 24.32%
+
+  Pricing:
+    netflix: 53.34%
+    general: 51.56%
+    hbo max: 53.07%
+    hulu: 51.46%
+    amazon prime: 50.43%
+    peacock: 51.84%
+    disney+: 56.97%
+    paramount+: 49.42%
+    apple tv+: 54.05%
+
+  Ui_ux:
+    netflix: 50.79%
+    general: 50.43%
+    hbo max: 51.28%
+    hulu: 50.09%
+    amazon prime: 52.44%
+    peacock: 51.34%
+    disney+: 50.48%
+    paramount+: 51.08%
+    apple tv+: 47.30%
+
+  Technical:
+    netflix: 50.78%
+    general: 50.08%
+    hbo max: 48.77%
+    hulu: 49.72%
+    amazon prime: 48.42%
+    peacock: 49.65%
+    disney+: 50.71%
+    paramount+: 46.92%
+    apple tv+: 48.65%
+
+  Customer_service:
+    netflix: 52.41%
+    general: 50.97%
+    hbo max: 52.40%
+    hulu: 51.90%
+    amazon prime: 60.46%
+    peacock: 54.10%
+    disney+: 53.33%
+    paramount+: 49.58%
+    apple tv+: 64.86%
+
+Performing ablation study...
+
+Ablation Study Results:
+
+Base Model (TF-IDF only):
+  Accuracy:  0.8279
+  Precision: 0.8171
+  Recall:    0.8057
+  F1 Score:  0.8114
+
+With Manual Features:
+  Accuracy:  0.8282
+  Precision: 0.8174
+  Recall:    0.8060
+  F1 Score:  0.8117
+
+With Platform Features:
+  Accuracy:  0.8280
+  Precision: 0.8172
+  Recall:    0.8057
+  F1 Score:  0.8114
+
+With Sarcasm Features:
+  Accuracy:  0.8282
+  Precision: 0.8175
+  Recall:    0.8058
+  F1 Score:  0.8116
+
+With NER Features:
+  Accuracy:  0.8290
+  Precision: 0.8184
+  Recall:    0.8068
+  F1 Score:  0.8126
+
+With WSD Replacing TF-IDF Input:
+  Accuracy:  0.8136
+  Precision: 0.7967
+  Recall:    0.7977
+  F1 Score:  0.7972
+
+With All Features (Except WSD):
+  Accuracy:  0.8282
+  Precision: 0.8175
+  Recall:    0.8058
+  F1 Score:  0.8116
+
+With All Features (Using WSD):
+  Accuracy:  0.8134
+  Precision: 0.7976
+  Recall:    0.7958
+  F1 Score:  0.7967
