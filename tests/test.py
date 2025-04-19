@@ -176,7 +176,7 @@ def plot_performance_comparison(results):
     plt.tight_layout()
     
     # Ensure directory exists
-    os.makedirs('evaluation/evaluation/results', exist_ok=True)
+    os.makedirs('../evaluation/evaluation/results', exist_ok=True)
     
     # Save the figure
     plt.savefig('evaluation/evaluation/results/query_performance.png')
@@ -309,10 +309,10 @@ Testing the performance of different facet query types.
 """
     
     # Ensure directory exists
-    os.makedirs('evaluation/evaluation/results', exist_ok=True)
+    os.makedirs('../evaluation/evaluation/results', exist_ok=True)
     
     # Save the report
-    with open('evaluation/evaluation/results/performance_report.md', 'w') as f:
+    with open('../evaluation/evaluation/results/performance_report.md', 'w') as f:
         f.write(report)
     
     print("Performance report saved to evaluation/evaluation/results/performance_report.md")
